@@ -1,0 +1,11 @@
+{
+    "image": "rocketio/dev:20250101",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools-extension-pack",
+                "xaver.clang-format"
+            ]
+        }
+    }
+}

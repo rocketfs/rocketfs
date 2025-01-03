@@ -58,4 +58,4 @@ RUN git clone https://github.com/include-what-you-use/include-what-you-use.git -
   make install                                                                             &&\
   cd ../..                                                                                 &&\
   rm -rf include-what-you-use
-RUN pip install cpplint --break-system-packages
+RUN pip install cmakelang cpplint --break-system-packages
