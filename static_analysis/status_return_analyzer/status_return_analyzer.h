@@ -18,32 +18,39 @@
 
 namespace rocketfs {
 
+class FuncStatusReturnAnalyzer {
+ public:
+  FuncStatusReturnAnalyzer(clang::ASTContext* ast_context,
+                           clang::FunctionDecl* function_decl);
+
+  void Visit();
+
+ private:
+  void VisitStatement(clang::Stmt* body);
+
+  void HandleReturnStmt(clang::ReturnStmt* return_stmt);
+  bool IsValidCondition(const clang::Expr* cond) const;
+  void CollectExcludedValues(const clang::Expr* cond);
+
+  std::set<std::string> ParseRetvalComments(
+      clang::comments::FullComment* full_comment,
+      const clang::comments::CommandTraits& command_traits) const;
+
+ private:
+  clang::ASTContext* ast_context_;
+  clang::FunctionDecl* function_decl_;
+  std::map<unsigned, std::set<std::string>> variable_values_;
+  std::set<std::string> return_values_;
+};
+
 class StatusReturnAnalyzer
     : public clang::RecursiveASTVisitor<StatusReturnAnalyzer> {
  public:
   explicit StatusReturnAnalyzer(clang::ASTContext* ast_context);
-
   bool VisitFunctionDecl(clang::FunctionDecl* function_decl);
 
  private:
-  std::set<std::string> ParseRetvalComments(
-      clang::comments::FullComment* full_comment,
-      const clang::comments::CommandTraits& command_traits) const;
-  void HandleReturnStmt(clang::ReturnStmt* return_stmt,
-                        std::set<std::string>& return_value_range);
-  void AddVariableValuesToRange(unsigned var_id,
-                                std::set<std::string>& return_value_range);
-
-  bool IsValidCondition(const clang::Expr* cond) const;
-  void CollectExcludedValues(const clang::Expr* cond);
-
-  clang::Scope* FindMeaningfulScope(clang::Scope* currentScope);
-  bool VisitStatement(clang::Stmt* body,
-                      std::set<std::string>& return_value_range);
-
- private:
   clang::ASTContext* ast_context_;
-  std::map<unsigned, std::set<std::string>> variable_values_;
 };
 
 class StatusReturnAnalyzerConsumer : public clang::ASTConsumer {

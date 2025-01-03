@@ -12,6 +12,7 @@
 
 #include <cassert>
 #include <memory>
+#include <regex>
 
 #include "clang/AST/Decl.h"
 #include "clang/AST/Expr.h"
@@ -24,7 +25,122 @@
 
 namespace rocketfs {
 
-bool StatusReturnAnalyzer::IsValidCondition(const clang::Expr* cond) const {
+FuncStatusReturnAnalyzer::FuncStatusReturnAnalyzer(
+    clang::ASTContext* ast_context, clang::FunctionDecl* function_decl)
+    : ast_context_(ast_context), function_decl_(function_decl) {
+  assert(ast_context_ != nullptr);
+  assert(function_decl_ != nullptr);
+}
+
+void FuncStatusReturnAnalyzer::Visit() {
+  clang::Stmt* body = function_decl_->getBody();
+  if (!body) {
+    return;
+  }
+  VisitStatement(body);
+  llvm::errs() << "Function: " << function_decl_->getQualifiedNameAsString()
+               << "\n";
+  llvm::errs() << "Return value range:\n";
+  for (const auto& value : return_values_) {
+    llvm::errs() << "\t" << value << "\n";
+  }
+}
+
+void FuncStatusReturnAnalyzer::VisitStatement(clang::Stmt* stmt) {
+  assert(stmt != nullptr);
+  for (clang::Stmt* child_stmt : stmt->children()) {
+    VisitStatement(child_stmt);
+  }
+  if (clang::DeclStmt* decl_stmt = llvm::dyn_cast<clang::DeclStmt>(stmt)) {
+    for (clang::Decl* decl : decl_stmt->decls()) {
+      if (clang::VarDecl* var_decl = llvm::dyn_cast<clang::VarDecl>(decl)) {
+        if (var_decl->getType().getAsString() == "const Status") {
+          unsigned var_id = var_decl->getID();
+          clang::CallExpr* init = llvm::dyn_cast<clang::CallExpr>(
+              var_decl->getInit()->IgnoreImplicit());
+          assert(init != nullptr);
+          clang::FunctionDecl* callee = init->getDirectCallee();
+          assert(callee != nullptr);
+          clang::comments::FullComment* full_comment =
+              ast_context_->getCommentForDecl(callee, nullptr);
+          assert(full_comment != nullptr);
+          const auto& retval_comments = ParseRetvalComments(
+              full_comment, ast_context_->getCommentCommandTraits());
+          variable_values_[var_id].insert(retval_comments.begin(),
+                                          retval_comments.end());
+        }
+      }
+    }
+  }
+  if (clang::ReturnStmt* return_stmt =
+          llvm::dyn_cast<clang::ReturnStmt>(stmt)) {
+    HandleReturnStmt(return_stmt);
+  }
+}
+
+void FuncStatusReturnAnalyzer::HandleReturnStmt(
+    clang::ReturnStmt* return_stmt) {
+  assert(return_stmt != nullptr);
+  const clang::Expr* return_value =
+      return_stmt->getRetValue()->IgnoreImplicit();
+  assert(return_value != nullptr);
+
+  const clang::Stmt* parent = ast_context_->getParentMapContext()
+                                  .getParents(*return_stmt)[0]
+                                  .get<clang::Stmt>();
+  while (parent != nullptr && llvm::isa<clang::CompoundStmt>(parent)) {
+    parent = ast_context_->getParentMapContext()
+                 .getParents(*parent)[0]
+                 .get<clang::Stmt>();
+  }
+  if (parent != nullptr) {
+    const auto* if_stmt = llvm::dyn_cast<clang::IfStmt>(parent);
+    if (if_stmt) {
+      const clang::Expr* cond = if_stmt->getCond();
+      if (IsValidCondition(cond)) {
+        std::set<std::string> excluded_values;
+        const clang::Expr* status_expr = nullptr;
+        CollectExcludedValues(cond);
+        llvm::errs() << "in if stmt\n";
+      }
+    }
+  }
+
+  if (const auto* call = llvm::dyn_cast<clang::CallExpr>(return_value)) {
+    if (const clang::FunctionDecl* callee = call->getDirectCallee()) {
+      if (callee->getQualifiedNameAsString().find("Status::") == 0) {
+        return_values_.insert("Status::" + callee->getNameAsString());
+      } else {
+        const auto& retval_comments = ParseRetvalComments(
+            ast_context_->getCommentForDecl(callee, nullptr),
+            ast_context_->getCommentCommandTraits());
+        return_values_.insert(retval_comments.begin(), retval_comments.end());
+      }
+    }
+  } else if (const auto* construct =
+                 llvm::dyn_cast<clang::CXXConstructExpr>(return_value)) {
+    // Unwrap the first argument to the constructor
+    if (construct->getNumArgs() > 0) {
+      const clang::Expr* constructor_arg =
+          construct->getArg(0)->IgnoreImplicit();
+      // Check if the constructor argument is a variable reference
+      if (const auto* var_ref =
+              llvm::dyn_cast<clang::DeclRefExpr>(constructor_arg)) {
+        if (const clang::VarDecl* var_decl =
+                llvm::dyn_cast<clang::VarDecl>(var_ref->getDecl())) {
+          unsigned var_id = var_decl->getID();
+          assert(variable_values_.find(var_id) != variable_values_.end());
+          return_values_.insert(variable_values_[var_id].begin(),
+                                variable_values_[var_id].end());
+        }
+      }
+    }
+  } else {
+    assert(false);
+  }
+}
+
+bool FuncStatusReturnAnalyzer::IsValidCondition(const clang::Expr* cond) const {
   assert(cond != nullptr);
   if (const auto* binary_op = llvm::dyn_cast<clang::BinaryOperator>(cond)) {
     // Only allow `||`.
@@ -38,7 +154,7 @@ bool StatusReturnAnalyzer::IsValidCondition(const clang::Expr* cond) const {
   return true;
 }
 
-void StatusReturnAnalyzer::CollectExcludedValues(const clang::Expr* cond) {
+void FuncStatusReturnAnalyzer::CollectExcludedValues(const clang::Expr* cond) {
   assert(cond != nullptr);
 
   // Case 1: Logical OR (`||`)
@@ -124,223 +240,45 @@ void StatusReturnAnalyzer::CollectExcludedValues(const clang::Expr* cond) {
   }
 }
 
-StatusReturnAnalyzer::StatusReturnAnalyzer(clang::ASTContext* ast_context)
-    : ast_context_(ast_context) {}
-
-bool StatusReturnAnalyzer::VisitStatement(
-    clang::Stmt* stmt, std::set<std::string>& return_value_range) {
-  if (clang::DeclStmt* decl_stmt = llvm::dyn_cast<clang::DeclStmt>(stmt)) {
-    // Process variable declarations
-    for (clang::Decl* decl : decl_stmt->decls()) {
-      if (clang::VarDecl* var_decl = llvm::dyn_cast<clang::VarDecl>(decl)) {
-        if (var_decl->getType().getAsString() == "const Status") {
-          unsigned var_id = var_decl->getID();
-          if (clang::CallExpr* init = llvm::dyn_cast<clang::CallExpr>(
-                  var_decl->getInit()->IgnoreImplicit())) {
-            if (clang::FunctionDecl* callee = init->getDirectCallee()) {
-              clang::comments::FullComment* full_comment =
-                  ast_context_->getCommentForDecl(callee, nullptr);
-              if (full_comment) {
-                const auto& retval_comments = ParseRetvalComments(
-                    full_comment, ast_context_->getCommentCommandTraits());
-                variable_values_[var_id].insert(retval_comments.begin(),
-                                                retval_comments.end());
-              }
-            }
-          } else {
-            llvm::errs() << "Error: Status variable must be initialized with "
-                            "a function call.\n";
-            llvm::errs() << "Raw AST:\n";
-            var_decl->getInit()->dump();
-            llvm::errs() << "Pretty-printed initializer:\n";
-            var_decl->getInit()->printPretty(
-                llvm::errs(), nullptr, ast_context_->getPrintingPolicy());
-            llvm::errs() << "\n";
-          }
-        }
-      }
-    }
-  } else if (clang::ReturnStmt* return_stmt =
-                 llvm::dyn_cast<clang::ReturnStmt>(stmt)) {
-    // Process return statement
-    HandleReturnStmt(return_stmt, return_value_range);
-  } else {
-    for (clang::Stmt* sub : stmt->children()) {
-      VisitStatement(sub, return_value_range);
-    }
-  }
-  return true;
-}
-
-bool StatusReturnAnalyzer::VisitFunctionDecl(clang::FunctionDecl* fn_decl) {
-  llvm::dbgs() << "Visiting function: " << fn_decl->getQualifiedNameAsString()
-               << "\n";
-
-  clang::Stmt* body = fn_decl->getBody();
-  if (!body) {
-    llvm::dbgs() << "No body for function: "
-                 << fn_decl->getQualifiedNameAsString() << "\n";
-    return true;
-  }
-
-  std::set<std::string>
-      return_value_range;  // The overall return value range for the function
-  VisitStatement(body, return_value_range);
-
-  // Print final return value range
-  llvm::errs() << "Function: " << fn_decl->getQualifiedNameAsString() << "\n";
-  llvm::errs() << "Return value range:\n";
-  for (const auto& value : return_value_range) {
-    llvm::errs() << "\t" << value << "\n";
-  }
-
-  return true;
-}
-
-// clang::Scope *
-// StatusReturnAnalyzer::FindMeaningfulScope(clang::Scope *currentScope) {
-//   while (currentScope) {
-//     if (currentScope->isControlScope()) {
-//       // Found a control structure scope (e.g., if, switch, while, for)
-//       return currentScope;
-//     }
-//     if (currentScope->isFunctionScope()) {
-//       // Stop at function scope
-//       return currentScope;
-//     }
-//     currentScope = currentScope->getParent();
-//   }
-//   return nullptr; // No meaningful scope found
-// }
-
-void StatusReturnAnalyzer::HandleReturnStmt(
-    clang::ReturnStmt* return_stmt, std::set<std::string>& return_value_range) {
-  if (!return_stmt) {
-    return;
-  }
-
-  const clang::Expr* ret_value = return_stmt->getRetValue()->IgnoreImplicit();
-  if (!ret_value) {
-    return;
-  }
-
-  const clang::Stmt* parent = ast_context_->getParentMapContext()
-                                  .getParents(*return_stmt)[0]
-                                  .get<clang::Stmt>();
-  while (parent != nullptr && llvm::isa<clang::CompoundStmt>(parent)) {
-    parent = ast_context_->getParentMapContext()
-                 .getParents(*parent)[0]
-                 .get<clang::Stmt>();
-  }
-  if (parent != nullptr) {
-    // llvm::errs() << "parent's Raw AST:\n";
-    // parent->dump();
-    const auto* if_stmt = llvm::dyn_cast<clang::IfStmt>(parent);
-    if (if_stmt) {
-      const clang::Expr* cond = if_stmt->getCond();
-      if (IsValidCondition(cond)) {
-        std::set<std::string> excluded_values;
-        const clang::Expr* status_expr = nullptr;
-        CollectExcludedValues(cond);
-        llvm::errs() << "in if stmt\n";
-      }
-    }
-  }
-
-  if (const auto* call = llvm::dyn_cast<clang::CallExpr>(ret_value)) {
-    if (const clang::FunctionDecl* callee =
-            call->getDirectCallee()) {  // Use const
-                                        // Direct return: return Status::OK()
-      if (callee->getQualifiedNameAsString().find("Status::") == 0) {
-        // Old way: just use the callee's name to identify the return type
-        // llvm::errs() << "returning Status type directly from: "
-        //              << callee->getNameAsString() << "\n";
-        return_value_range.insert("Status::" + callee->getNameAsString());
-      } else {
-        // Analyze the comments associated with the callee function
-        // llvm::errs() << "Analyzing function call to: "
-        //              << callee->getNameAsString() << "\n";
-        const auto& retval_comments = ParseRetvalComments(
-            ast_context_->getCommentForDecl(callee, nullptr),
-            ast_context_->getCommentCommandTraits());
-        return_value_range.insert(retval_comments.begin(),
-                                  retval_comments.end());
-      }
-      // return_value_range.insert(callee->getNameAsString());
-    }
-  }
-  //   else if (const auto *var_ref =
-  //                  llvm::dyn_cast<clang::DeclRefExpr>(ret_value)) {
-  //     // Variable return: return s
-  //     if (const clang::VarDecl *var_decl = // Use const
-  //         llvm::dyn_cast<clang::VarDecl>(var_ref->getDecl())) {
-  //       unsigned var_id = var_decl->getID();
-  //       AddVariableValuesToRange(var_id, return_value_range);
-  //     }
-  //   }
-  // Handle CXXConstructExpr for return statements
-  else if (const auto* construct =
-               llvm::dyn_cast<clang::CXXConstructExpr>(ret_value)) {
-    // Unwrap the first argument to the constructor
-    if (construct->getNumArgs() > 0) {
-      const clang::Expr* constructor_arg =
-          construct->getArg(0)->IgnoreImplicit();
-      // Check if the constructor argument is a variable reference
-      if (const auto* var_ref =
-              llvm::dyn_cast<clang::DeclRefExpr>(constructor_arg)) {
-        if (const clang::VarDecl* var_decl =
-                llvm::dyn_cast<clang::VarDecl>(var_ref->getDecl())) {
-          // Variable return: return s;
-          unsigned var_id = var_decl->getID();
-          AddVariableValuesToRange(var_id, return_value_range);
-        }
-      }
-    }
-  } else {
-    llvm::errs() << "unknown return stmt\n";
-    llvm::errs() << "Raw AST:\n";
-    ret_value->dump();
-  }
-}
-
-std::set<std::string> StatusReturnAnalyzer::ParseRetvalComments(
+std::set<std::string> FuncStatusReturnAnalyzer::ParseRetvalComments(
     clang::comments::FullComment* full_comment,
     const clang::comments::CommandTraits& command_traits) const {
-  std::set<std::string> retvals;
-
   if (!full_comment) {
-    return retvals;
+    return {};
   }
-
+  std::set<std::string> return_values;
   for (const auto* block : full_comment->getBlocks()) {
     if (const auto* block_command =
             llvm::dyn_cast<clang::comments::BlockCommandComment>(block)) {
       if (block_command->getCommandName(command_traits) == "retval" &&
           block_command->getNumArgs() > 0) {
         auto retval = block_command->getArgText(0).str();
-        // Replace starts_with and ends_with with C++17-compatible logic
-        if (retval.compare(0, 6, "Status") == 0 && retval.size() >= 2 &&
-            retval.substr(retval.size() - 2) == "()") {
-          retvals.emplace(retval.substr(0, retval.size() - 2));
-        }
+        std::regex retval_regex(R"(^(Status::\S+)\(\)$)");
+        std::smatch match;
+        assert(std::regex_match(retval, match, retval_regex));
+        assert(match.size() == 2);
+        assert(return_values.emplace(match[1].str()).second);
       }
     }
   }
-  return retvals;
+  return return_values;
 }
 
-void StatusReturnAnalyzer::AddVariableValuesToRange(
-    unsigned var_id, std::set<std::string>& return_value_range) {
-  auto it = variable_values_.find(var_id);
-  if (it != variable_values_.end()) {
-    return_value_range.insert(it->second.begin(), it->second.end());
-  }
+StatusReturnAnalyzer::StatusReturnAnalyzer(clang::ASTContext* ast_context)
+    : ast_context_(ast_context) {
+  assert(ast_context_ != nullptr);
+}
+
+bool StatusReturnAnalyzer::VisitFunctionDecl(clang::FunctionDecl* func_decl) {
+  assert(func_decl != nullptr);
+  FuncStatusReturnAnalyzer(ast_context_, func_decl).Visit();
+  return true;
 }
 
 void StatusReturnAnalyzerConsumer::HandleTranslationUnit(
     clang::ASTContext& ast_context) {
-  StatusReturnAnalyzer analyzer(&ast_context);
-  analyzer.TraverseDecl(ast_context.getTranslationUnitDecl());
+  StatusReturnAnalyzer(&ast_context)
+      .TraverseDecl(ast_context.getTranslationUnitDecl());
 }
 
 bool StatusReturnAnalyzerAction::ParseArgs(
