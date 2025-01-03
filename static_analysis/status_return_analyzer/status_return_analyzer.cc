@@ -9,6 +9,7 @@
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <cassert>
 #include <memory>
 
 #include "clang/AST/Decl.h"
@@ -24,135 +25,25 @@
 namespace rocketfs {
 
 bool StatusReturnAnalyzer::IsValidCondition(const clang::Expr* cond) const {
-  if (!cond) {
-    return false;  // Invalid input
-  }
-
-  // Case 1: Logical OR (`||`)
+  assert(cond != nullptr);
   if (const auto* binary_op = llvm::dyn_cast<clang::BinaryOperator>(cond)) {
-    if (binary_op->getOpcode() == clang::BO_LOr) {  // Only allow `||`
+    // Only allow `||`.
+    // Reject other binary operators (e.g., `&&`).
+    if (binary_op->getOpcode() == clang::BO_LOr) {
       return IsValidCondition(binary_op->getLHS()) &&
              IsValidCondition(binary_op->getRHS());
     }
-    return false;  // Reject other binary operators (e.g., `&&`)
+    return false;
   }
-
-  //   // Case 2: Single method call like `s.IsOK()`
-  //   if (const auto *call_expr = llvm::dyn_cast<clang::CallExpr>(cond)) {
-  //     // Ensure the callee is a member function
-  //     const auto *member =
-  //         llvm::dyn_cast<clang::MemberExpr>(call_expr->getCallee());
-  //     if (!member) {
-  //       return false; // Not a member function call
-  //     }
-
-  //     // Ensure the method name starts with "Is"
-  //     const std::string method_name =
-  //     member->getMemberDecl()->getNameAsString(); if (method_name.find("Is")
-  //     != 0) {
-  //       return false; // Method name does not start with "Is"
-  //     }
-
-  //     // Ensure the base of the member expression references the correct
-  //     variable const auto *base = llvm::dyn_cast<clang::DeclRefExpr>(
-  //         member->getBase()->IgnoreParenCasts());
-  //     if (!base) {
-  //       return false; // Base does not refer to the correct variable
-  //     }
-
-  //     return true; // Valid `s.IsXXX()` call
-  //   }
-
-  // Case 3: Invalid condition
   return true;
 }
 
-// bool StatusReturnAnalyzer::HasSingleAllowedBranchBetween(
-//     const clang::Stmt *decl_stmt, const clang::Stmt *return_stmt,
-//     clang::ASTContext &context, const clang::VarDecl *var_decl) const {
-//   if (!decl_stmt || !return_stmt || !var_decl) {
-//     return false; // Invalid inputs
-//   }
-
-//   int if_count = 0;
-
-//   // Get the parent scope of the declaration statement
-//   const auto decl_parents = context.getParents(*decl_stmt);
-//   if (decl_parents.empty()) {
-//     llvm::errs() << "Error: Declaration statement has no parent!\n";
-//     return false;
-//   }
-
-//   const clang::Stmt *decl_scope = decl_parents[0].get<clang::Stmt>();
-//   if (!decl_scope) {
-//     llvm::errs()
-//         << "Error: Parent of the declaration statement is not a Stmt!\n";
-//     return false;
-//   }
-
-//   // Traverse the parent chain of the return statement
-//   const clang::Stmt *current = return_stmt;
-//   while (current) {
-//     const auto parents = context.getParents(*current);
-//     if (parents.empty()) {
-//       llvm::errs() << "Error: Return statement has no parent!\n";
-//       return false;
-//     }
-
-//     const clang::Stmt *parent = parents[0].get<clang::Stmt>();
-//     if (!parent) {
-//       llvm::errs() << "Error: Parent of the return statement is not a
-//       Stmt!\n"; return false;
-//     }
-
-//     // Stop if the current parent matches the declaration's scope
-//     if (parent == decl_scope) {
-//       return if_count ==
-//              1; // Allow optimization only if there is exactly one `if`
-//              branch
-//     }
-
-//     // Check if the current statement is an `if` branch
-//     if (const auto *if_stmt = llvm::dyn_cast<clang::IfStmt>(parent)) {
-//       if_count++;
-//       if (if_count > 1) {
-//         return false; // More than one `if` statement, disallow optimization
-//       }
-
-//       // Validate the condition of the `if` statement
-//       if (!IsValidCondition(if_stmt->getCond(), var_decl)) {
-//         return false; // Invalid condition, disallow optimization
-//       }
-
-//       // Continue checking the parent chain
-//       current = parent;
-//       continue;
-//     }
-
-//     // Disallow loops between the declaration and return
-//     if (llvm::isa<clang::ForStmt>(parent) ||
-//         llvm::isa<clang::WhileStmt>(parent) ||
-//         llvm::isa<clang::DoStmt>(parent)) {
-//       return false; // Loops are not allowed
-//     }
-
-//     // Move up the AST
-//     current = parent;
-//   }
-
-//   // Unexpected: Did not return within the same scope
-//   llvm::errs() << "Error: Did not reach the same scope as the
-//   declaration!\n"; return false;
-// }
-
 void StatusReturnAnalyzer::CollectExcludedValues(const clang::Expr* cond) {
-  if (!cond) {
-    return;
-  }
+  assert(cond != nullptr);
 
   // Case 1: Logical OR (`||`)
   if (const auto* binary_op = llvm::dyn_cast<clang::BinaryOperator>(cond)) {
-    if (binary_op->getOpcode() == clang::BO_LOr) {  // Logical OR
+    if (binary_op->getOpcode() == clang::BO_LOr) {
       CollectExcludedValues(binary_op->getLHS());
       CollectExcludedValues(binary_op->getRHS());
     }
@@ -233,9 +124,8 @@ void StatusReturnAnalyzer::CollectExcludedValues(const clang::Expr* cond) {
   }
 }
 
-StatusReturnAnalyzer::StatusReturnAnalyzer(clang::ASTContext* ast_context,
-                                           clang::Sema& sema)
-    : ast_context_(ast_context), sema_(sema) {}
+StatusReturnAnalyzer::StatusReturnAnalyzer(clang::ASTContext* ast_context)
+    : ast_context_(ast_context) {}
 
 bool StatusReturnAnalyzer::VisitStatement(
     clang::Stmt* stmt, std::set<std::string>& return_value_range) {
@@ -255,10 +145,6 @@ bool StatusReturnAnalyzer::VisitStatement(
               if (full_comment) {
                 const auto& retval_comments = ParseRetvalComments(
                     full_comment, ast_context_->getCommentCommandTraits());
-                //   llvm::errs()
-                //       << "here is the comment, size: " <<
-                //       retval_comments.size()
-                //       << "\n";
                 variable_values_[var_id].insert(retval_comments.begin(),
                                                 retval_comments.end());
               }
@@ -266,7 +152,6 @@ bool StatusReturnAnalyzer::VisitStatement(
           } else {
             llvm::errs() << "Error: Status variable must be initialized with "
                             "a function call.\n";
-            // Print the raw AST node
             llvm::errs() << "Raw AST:\n";
             var_decl->getInit()->dump();
             llvm::errs() << "Pretty-printed initializer:\n";
@@ -299,7 +184,6 @@ bool StatusReturnAnalyzer::VisitFunctionDecl(clang::FunctionDecl* fn_decl) {
                  << fn_decl->getQualifiedNameAsString() << "\n";
     return true;
   }
-  stmt_parent_map_.buildParentMap(body);
 
   std::set<std::string>
       return_value_range;  // The overall return value range for the function
@@ -364,27 +248,6 @@ void StatusReturnAnalyzer::HandleReturnStmt(
       }
     }
   }
-  //   else {
-  //     llvm::errs() << "parent is null\n";
-  //   }
-
-  //   clang::Scope *currentScope = sema_.getCurScope();
-  //   if (currentScope != nullptr) {
-  //     llvm::errs() << "Dumping scope:\n";
-  //     currentScope->dump(); // Outputs the scope details to llvm::errs()
-  //   }
-  //   clang::Scope *meaningfulScope = FindMeaningfulScope(currentScope);
-  //   if (meaningfulScope && meaningfulScope->isControlScope()) {
-  //     llvm::errs() << "control scope\n";
-  //   }
-
-  //   clang::Stmt *parent = stmt_parent_map_.getParent(return_stmt);
-  //   llvm::errs() << "dump return stmt:\n";
-  //   return_stmt->dump();
-  //   llvm::errs() << "dump parent:\n";
-  //   parent->dump();
-  //   if (auto *ifStmt = llvm::dyn_cast<clang::IfStmt>(parent)) {
-  //   }
 
   if (const auto* call = llvm::dyn_cast<clang::CallExpr>(ret_value)) {
     if (const clang::FunctionDecl* callee =
@@ -482,7 +345,7 @@ StatusReturnAnalyzerConsumer::StatusReturnAnalyzerConsumer(
 
 void StatusReturnAnalyzerConsumer::HandleTranslationUnit(
     clang::ASTContext& ast_context) {
-  StatusReturnAnalyzer analyzer(&ast_context, compiler_instance_.getSema());
+  StatusReturnAnalyzer analyzer(&ast_context);
   analyzer.TraverseDecl(ast_context.getTranslationUnitDecl());
 }
 

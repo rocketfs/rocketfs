@@ -18,52 +18,10 @@
 
 namespace rocketfs {
 
-class StmtParentMap {
- public:
-  // Traverse the Stmt and record parent-child relationships
-  void buildParentMap(clang::Stmt* root) {
-    if (!root) {
-      return;
-    }
-
-    // Recursively traverse the tree and populate the map
-    traverseStmt(root, nullptr);  // Root has no parent
-  }
-
-  // Get the parent of a given Stmt
-  clang::Stmt* getParent(clang::Stmt* child) const {
-    auto it = parentMap.find(child);
-    if (it != parentMap.end()) {
-      return it->second;
-    }
-    return nullptr;  // No parent found
-  }
-
- private:
-  std::unordered_map<clang::Stmt*, clang::Stmt*> parentMap;
-
-  // Recursive function to traverse the Stmt tree and record parent
-  // relationships
-  void traverseStmt(clang::Stmt* stmt, clang::Stmt* parent) {
-    if (!stmt) {
-      return;
-    }
-
-    // Record the parent of the current statement
-    parentMap[stmt] = parent;
-
-    // Recursively process all children
-    for (clang::Stmt* child : stmt->children()) {
-      traverseStmt(child, stmt);
-    }
-  }
-};
-
 class StatusReturnAnalyzer
     : public clang::RecursiveASTVisitor<StatusReturnAnalyzer> {
  public:
-  explicit StatusReturnAnalyzer(clang::ASTContext* ast_context,
-                                clang::Sema& sema);
+  explicit StatusReturnAnalyzer(clang::ASTContext* ast_context);
 
   bool VisitFunctionDecl(clang::FunctionDecl* function_decl);
 
@@ -73,25 +31,6 @@ class StatusReturnAnalyzer
       const clang::comments::CommandTraits& command_traits) const;
   void HandleReturnStmt(clang::ReturnStmt* return_stmt,
                         std::set<std::string>& return_value_range);
-  //   bool CanOptimizeReturn(clang::VarDecl *var_decl,
-  //                          clang::ReturnStmt *return_stmt,
-  //                          clang::Stmt *function_body,
-  //                          clang::ASTContext &context);
-  //   /// Checks whether there is exactly one allowed branch (e.g., one `if`
-  //   /// statement using valid conditions) between the declaration of a
-  //   variable
-  //   /// and its return statement.
-  //   bool HasSingleAllowedBranchBetween(const clang::Stmt *decl_stmt,
-  //                                      const clang::Stmt *return_stmt,
-  //                                      clang::ASTContext &context,
-  //                                      const clang::VarDecl *var_decl) const;
-  //   /// Validates whether the condition of an `if` statement is a valid
-  //   condition
-  //   /// for optimization. A valid condition:
-  //   /// - Must use logical OR (`||`) only.
-  //   /// - Each operand must call an `IsXXX` method on the same variable.
-  //   bool IsValidCondition(const clang::Expr *cond,
-  //                         const clang::VarDecl *var_decl) const;
   void AddVariableValuesToRange(unsigned var_id,
                                 std::set<std::string>& return_value_range);
 
@@ -108,11 +47,9 @@ class StatusReturnAnalyzer
 
  private:
   clang::ASTContext* ast_context_;
-  clang::Sema& sema_;
   std::map<unsigned, std::set<std::string>> variable_values_;
   std::map<unsigned, const clang::VarDecl*> var_decl_map;
   std::map<unsigned, const clang::Stmt*> init_stmt_map;
-  StmtParentMap stmt_parent_map_;
 };
 
 class StatusReturnAnalyzerConsumer : public clang::ASTConsumer {
