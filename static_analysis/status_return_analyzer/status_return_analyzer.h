@@ -29,8 +29,9 @@ class FuncStatusReturnAnalyzer {
   void VisitStatement(clang::Stmt* body);
 
   void HandleReturnStmt(clang::ReturnStmt* return_stmt);
-  bool IsValidCondition(const clang::Expr* cond) const;
-  void CollectExcludedValues(const clang::Expr* cond);
+  void ExcludeValuesInOrCond(const clang::Expr* cond_expr);
+  bool IsValidOrCond(const clang::Expr* cond_expr) const;
+  const clang::Stmt* GetParent(const clang::Stmt& stmt) const;
 
   std::set<std::string> ParseRetvalComments(
       clang::comments::FullComment* full_comment,
