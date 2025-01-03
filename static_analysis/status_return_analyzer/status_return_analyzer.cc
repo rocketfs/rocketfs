@@ -1,11 +1,12 @@
 // Copyright 2025 RocketFS
 
+#include "static_analysis/status_return_analyzer/status_return_analyzer.h"
+
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Comment.h>
 #include <clang/AST/Decl.h>
 #include <clang/Basic/LLVM.h>
 #include <clang/Frontend/FrontendPluginRegistry.h>
-// #include <fmt/core.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/raw_ostream.h>
 
@@ -20,7 +21,6 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "static_analysis/status_return_analyzer/status_return_analyzer.h"
 
 namespace rocketfs {
 
@@ -135,8 +135,6 @@ bool StatusReturnAnalyzer::VisitStatement(
       if (clang::VarDecl* var_decl = llvm::dyn_cast<clang::VarDecl>(decl)) {
         if (var_decl->getType().getAsString() == "const Status") {
           unsigned var_id = var_decl->getID();
-          var_decl_map[var_id] = var_decl;
-          init_stmt_map[var_id] = decl_stmt;
           if (clang::CallExpr* init = llvm::dyn_cast<clang::CallExpr>(
                   var_decl->getInit()->IgnoreImplicit())) {
             if (clang::FunctionDecl* callee = init->getDirectCallee()) {
@@ -339,10 +337,6 @@ void StatusReturnAnalyzer::AddVariableValuesToRange(
   }
 }
 
-StatusReturnAnalyzerConsumer::StatusReturnAnalyzerConsumer(
-    const clang::CompilerInstance& compiler_instance)
-    : compiler_instance_(compiler_instance) {}
-
 void StatusReturnAnalyzerConsumer::HandleTranslationUnit(
     clang::ASTContext& ast_context) {
   StatusReturnAnalyzer analyzer(&ast_context);
@@ -358,7 +352,7 @@ bool StatusReturnAnalyzerAction::ParseArgs(
 std::unique_ptr<clang::ASTConsumer>
 StatusReturnAnalyzerAction::CreateASTConsumer(
     clang::CompilerInstance& compiler_instance, clang::StringRef in_file) {
-  return std::make_unique<StatusReturnAnalyzerConsumer>(compiler_instance);
+  return std::make_unique<StatusReturnAnalyzerConsumer>();
 }
 
 }  // namespace rocketfs

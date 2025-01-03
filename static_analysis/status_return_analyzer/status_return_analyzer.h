@@ -35,10 +35,6 @@ class StatusReturnAnalyzer
                                 std::set<std::string>& return_value_range);
 
   bool IsValidCondition(const clang::Expr* cond) const;
-  bool HasSingleAllowedBranchBetween(const clang::Stmt* decl_stmt,
-                                     const clang::Stmt* return_stmt,
-                                     clang::ASTContext& context,
-                                     const clang::VarDecl* var_decl) const;
   void CollectExcludedValues(const clang::Expr* cond);
 
   clang::Scope* FindMeaningfulScope(clang::Scope* currentScope);
@@ -48,19 +44,11 @@ class StatusReturnAnalyzer
  private:
   clang::ASTContext* ast_context_;
   std::map<unsigned, std::set<std::string>> variable_values_;
-  std::map<unsigned, const clang::VarDecl*> var_decl_map;
-  std::map<unsigned, const clang::Stmt*> init_stmt_map;
 };
 
 class StatusReturnAnalyzerConsumer : public clang::ASTConsumer {
  public:
-  StatusReturnAnalyzerConsumer(
-      const clang::CompilerInstance& compiler_instance);
-
   void HandleTranslationUnit(clang::ASTContext& ast_context) override;
-
- private:
-  const clang::CompilerInstance& compiler_instance_;
 };
 
 class StatusReturnAnalyzerAction : public clang::PluginASTAction {
