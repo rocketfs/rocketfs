@@ -4,7 +4,10 @@
         "vscode": {
             "extensions": [
                 "ms-vscode.cpptools-extension-pack",
-                "xaver.clang-format"
+                "xaver.clang-format",
+                "ms-azuretools.vscode-docker",
+                "GitHub.vscode-github-actions",
+                "MarsCode.marscode-extension"
             ]
         }
     }

@@ -12,48 +12,61 @@ if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19)
   message(FATAL_ERROR "RocketFS requires Clang version 19 or higher.")
 endif()
 
+if(NOT CMAKE_C_COMPILER)
+  message(FATAL_ERROR "CMAKE_C_COMPILER is not set.")
+else()
+  message(STATUS "CMAKE_C_COMPILER is set to: ${CMAKE_C_COMPILER}.")
+endif()
+if(NOT CMAKE_CXX_COMPILER)
+  message(FATAL_ERROR "CMAKE_CXX_COMPILER is not set.")
+else()
+  message(STATUS "CMAKE_CXX_COMPILER is set to: ${CMAKE_CXX_COMPILER}.")
+endif()
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+list(APPEND CMAKE_MODULE_PATH
+     ${CMAKE_CURRENT_LIST_DIR}/thirdparty/builds/output
+     ${CMAKE_CURRENT_LIST_DIR}/cmake)
+
 find_program(IWYU_EXECUTABLE include-what-you-use REQUIRED)
 set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${IWYU_EXECUTABLE})
+find_program(CPPLINT_EXECUTABLE cpplint REQUIRED)
+set(CMAKE_CXX_CPPLINT ${CPPLINT_EXECUTABLE})
+find_program(CLANG_TIDY_EXECUTABLE clang-tidy REQUIRED)
+set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXECUTABLE})
 
-file(GLOB STATUS_RETURN_ANALYZER_SOURCES
-     static_analysis/status_return_analyzer/status_return_analyzer.cc)
-add_library(status_return_analyzer SHARED ${STATUS_RETURN_ANALYZER_SOURCES})
-find_program(LLVM_CONFIG_EXECUTABLE llvm-config REQUIRED)
-execute_process(
-  COMMAND ${LLVM_CONFIG_EXECUTABLE} --cxxflags
-  OUTPUT_VARIABLE LLVM_CXXFLAGS
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(
-  COMMAND ${LLVM_CONFIG_EXECUTABLE} --includedir
-  OUTPUT_VARIABLE LLVM_INCLUDE_DIR
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-execute_process(
-  COMMAND ${LLVM_CONFIG_EXECUTABLE} --libdir
-  OUTPUT_VARIABLE LLVM_LIB_DIR
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-target_include_directories(status_return_analyzer SYSTEM
-                           PRIVATE ${LLVM_INCLUDE_DIR} ${CMAKE_SOURCE_DIR})
-target_link_directories(
-  status_return_analyzer
-  PRIVATE
-  ${LLVM_LIB_DIR}
-  clangFrontend
-  clangAST
-  clangASTMatchers
-  clangBasic
-  clangLex)
+include(Targets)
+include(StatusReturnAnalyzer)
+include(ProtobufGenerator)
 
-file(GLOB TEST_SOURCE static_analysis/status_return_analyzer/test.cc)
-add_custom_target(
-  test_status_return_analyzer
-  COMMAND
-    ${CMAKE_CXX_COMPILER} ${TEST_SOURCE} -fsyntax-only -Xclang -load -Xclang
-    ${CMAKE_BINARY_DIR}/libstatus_return_analyzer.so -Xclang -plugin -Xclang
-    status-return-analyzer
-  DEPENDS status_return_analyzer)
+find_package(OpenSSL CONFIG REQUIRED)
+find_package(gRPC CONFIG REQUIRED)
+find_package(asio-grpc CONFIG REQUIRED)
+find_package(unifex CONFIG REQUIRED)
+
+file(GLOB_RECURSE NAMENODE_SRCS ${CMAKE_SOURCE_DIR}/src/namenode/*.cc)
+add_executable(namenode_executable ${NAMENODE_SRCS})
+target_link_libraries(
+  namenode_executable
+  PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex unifex::unifex
+  PRIVATE -fsanitize=address,undefined)
+target_compile_definitions(
+  namenode_executable
+  PRIVATE UNIFEX_NO_ASYNC_STACKS
+  PRIVATE UNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF)
+
+file(GLOB_RECURSE CLIENT_SRCS ${CMAKE_SOURCE_DIR}/src/client/*.cc)
+add_executable(client_executable ${CLIENT_SRCS})
+target_link_libraries(
+  client_executable
+  PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex unifex::unifex
+  PRIVATE -fsanitize=address,undefined)
+target_compile_definitions(
+  client_executable
+  PRIVATE UNIFEX_NO_ASYNC_STACKS
+  PRIVATE UNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF)
