@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package rocketfs;
+
+message PingRequest {
+  string ping = 1;
+}
+message PongResponse {
+  string pong = 2;
+}
+
+message MkdirsRequest {
+  string src = 1;
+  bool create_missing_parent = 2;
+}
+message MkdirsResponse {
+  bool result = 1;
+}
+
+// https://github.com/apache/hadoop/blob/266dad1617d599f7d247b54d03b4741f85cd6460/hadoop-hdfs-project/hadoop-hdfs-client/src/main/proto/ClientNamenodeProtocol.proto#
+service ClientNamenodeService {
+  rpc ping_pong(PingRequest) returns (PongResponse);
+
+  // rpc mkdirs(MkdirsRequest) returns (MkdirsResponse);
+}
