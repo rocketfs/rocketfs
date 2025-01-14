@@ -1,0 +1,11 @@
+name: Docker Image CI
+on:
+  # Allows manual trigger of the workflow from the GitHub UI.
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Docker image
+        run: docker build . --file dockerfile/dev.dockerfile --tag my-image-name:$(date +%s)
