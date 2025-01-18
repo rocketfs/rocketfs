@@ -1,5 +1,5 @@
 # docker build -t rocketio/dev:20250118 -f dev.dockerfile .
-FROM debian:bookworm-20241223 AS build
+FROM debian:bookworm-20241223
 # https://docs.docker.com/reference/dockerfile/#shell
 # The `SHELL` instruction allows the default shell used for
 # the shell form of commands to be overridden.
@@ -7,28 +7,16 @@ FROM debian:bookworm-20241223 AS build
 # Always use `set -eo pipefail`.
 # Fail fast and be aware of exit codes.
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-RUN apt-get update                           &&\
-  apt-get install -y --no-install-recommends   \
-  wget=1.21.3-1+b2                             \
-  cmake=3.25.1-1 make=4.3-4.1                  \
-  gcc=4:12.2.0-3 g++=4:12.2.0-3              &&\
-  apt-get clean
-WORKDIR /root
-RUN wget -qO- https://github.com/Kitware/CMake/releases/download/v3.31.3/cmake-3.31.3-linux-x86_64.tar.gz |\
-  tar xzv -C /root
-RUN mv /root/cmake-3.31.3-linux-x86_64 /root/cmake
-
-FROM debian:bookworm-20241223
-SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-RUN apt-get update                                                          &&\
-  apt-get install -y apt-transport-https=2.6.1                                \
-  ca-certificates=20230311                                                    \
-  gnupg2=2.2.40-1.1                                                           \
-  git=1:2.39.5-0+deb12u1 wget=1.21.3-1+b2                                     \
-  autoconf=2.71-3 build-essential=12.9 libtool=2.4.7-7~deb12u1 make=4.3-4.1   \
-  python3=3.11.2-1+b1 python3-pip=23.0.1+dfsg-1                               \
-  gcc=4:12.2.0-3 g++=4:12.2.0-3 gdb=13.1-3                                  &&\
-  apt-get clean                                                             &&\
+RUN apt-get update                                             &&\
+  apt-get install -y --no-install-recommends                     \
+  apt-transport-https=2.6.1 ca-certificates=20230311             \
+  gnupg2=2.2.40-1.1                                              \
+  git=1:2.39.5-0+deb12u1 wget=1.21.3-1+b2                        \
+  autoconf=2.71-3 build-essential=12.9 libtool=2.4.7-7~deb12u1   \
+  cmake=3.25.1-1 make=4.3-4.1                                    \
+  python3=3.11.2-1+b1 python3-pip=23.0.1+dfsg-1                  \
+  gcc=4:12.2.0-3 g++=4:12.2.0-3 gdb=13.1-3                     &&\
+  apt-get clean                                                &&\
   rm -rf /var/lib/apt/lists/*
 # https://apt.llvm.org/
 RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key    |\
@@ -55,14 +43,12 @@ RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key    |\
   apt-get clean                                            &&\
   rm -rf /var/lib/apt/lists/*
 RUN find /usr/bin -regextype posix-extended  \
-  -regex "^.*/(llvm|clang)-.*-19$"          |\
+  -regex "^.*/(llvm|clang).*-19$"           |\
   while read bin;                            \
   do                                         \
   target=$(echo "$bin" | sed "s/-19$//");    \
   ln -sf "$bin" "$target";                   \
   done
-COPY --from=build /root/cmake /root/cmake
-RUN ln -sf /root/cmake/bin/cmake /usr/bin/cmake
 RUN git clone https://github.com/include-what-you-use/include-what-you-use.git -b clang_19 &&\
   cd include-what-you-use                                                                  &&\
   mkdir build                                                                              &&\
