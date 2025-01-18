@@ -1,140 +1,125 @@
 // Copyright 2025 RocketFS
 
-#include <grpcpp/server.h>
+#include <gflags/gflags.h>
+#include <google/protobuf/arena.h>
+#include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server_builder.h>
-#include <src/proto/client_namenode.grpc.pb.h>
+#include <grpcpp/support/status.h>
+
+#include <memory_resource>
+#include <type_traits>
+#include <utility>
 
 #include <agrpc/asio_grpc.hpp>
+#include <agrpc/grpc_context.hpp>
+#include <agrpc/register_sender_rpc_handler.hpp>
+#include <agrpc/server_rpc.hpp>
+#include <unifex/blocking.hpp>
 #include <unifex/finally.hpp>
+#include <unifex/inline_scheduler.hpp>
+#include <unifex/just.hpp>
 #include <unifex/just_from.hpp>
-#include <unifex/just_void_or_done.hpp>
 #include <unifex/let_value_with.hpp>
+#include <unifex/scheduler_concepts.hpp>
 #include <unifex/sync_wait.hpp>
-#include <unifex/task.hpp>
 #include <unifex/then.hpp>
 #include <unifex/when_all.hpp>
 #include <unifex/with_query_value.hpp>
 
-using ExampleService = rocketfs::ClientNamenodeService::AsyncService;
+#include "src/proto/client_namenode.grpc.pb.h"
+#include "src/proto/client_namenode.pb.h"
 
-using UnaryRPC = agrpc::ServerRPC<&ExampleService::Requestping_pong>;
+DEFINE_string(client_namenode_service_listen_address,
+              "0.0.0.0:50051",
+              "The listen address for the client namenode service.");
 
-auto register_unary_request_handler(
-    agrpc::GrpcContext& grpc_context,
-    rocketfs::ClientNamenodeService::AsyncService& service) {
-  // Register a handler for all incoming RPCs of this unary method until the
-  // server is being shut down.
-  return agrpc::register_sender_rpc_handler<UnaryRPC>(
-      grpc_context,
-      service,
-      [&](UnaryRPC& rpc, const UnaryRPC::Request& request) {
-        return unifex::let_value_with([] { return UnaryRPC::Response{}; },
-                                      [&](auto& response) {
-                                        response.set_pong("pong");
-                                        return rpc.finish(response,
-                                                          grpc::Status::OK);
-                                      });
-      });
+class ArenaRequestMessageFactory {
+ public:
+  ArenaRequestMessageFactory()
+      : monotonic_buffer_resource_(&unsynchronized_pool_resource_),
+        arena_(google::protobuf::ArenaOptions{
+            .memory_resource = &monotonic_buffer_resource_}) {
+  }
+
+  template <class Request>
+  Request& create() {
+    return *google::protobuf::Arena::Create<Request>(&arena_);
+  }
+
+ private:
+  std::pmr::unsynchronized_pool_resource unsynchronized_pool_resource_;
+  std::pmr::monotonic_buffer_resource monotonic_buffer_resource_;
+  // The goal is to allocate heap memory (from jemalloc/tcmalloc) only once
+  // while serving an RPC request.
+  google::protobuf::Arena arena_;
+};
+
+template <class Handler>
+class RPCHandlerWithArenaRequestMessageFactory {
+ public:
+  explicit RPCHandlerWithArenaRequestMessageFactory(Handler handler)
+      : handler_(std::move(handler)) {
+  }
+
+  template <class... Args>
+  decltype(auto) operator()(Args&&... args) {
+    return handler_(std::forward<Args>(args)...);
+  }
+
+  ArenaRequestMessageFactory request_message_factory() {
+    return {};
+  }
+
+ private:
+  Handler handler_;
+};
+
+auto register_ping_pong_request_handler(
+    agrpc::GrpcContext* grpc_context,
+    rocketfs::ClientNamenodeService::AsyncService* service) {
+  using PingPongRPC = agrpc::ServerRPC<
+      &rocketfs::ClientNamenodeService::AsyncService::Requestping_pong>;
+  return agrpc::register_sender_rpc_handler<PingPongRPC>(
+      *grpc_context,
+      *service,
+      RPCHandlerWithArenaRequestMessageFactory{
+          [](PingPongRPC& rpc,
+             const PingPongRPC::Request& /*request*/,
+             ArenaRequestMessageFactory&) {
+            return unifex::let_value_with(
+                [&] { return PingPongRPC::Response(); },
+                [&](auto& response) {
+                  response.set_pong("pong");
+                  return rpc.finish(response, grpc::Status::OK);
+                });
+          }});
 }
-
-template <typename T>
-struct TypePrinter;
 
 template <class Sender>
-void run_grpc_context_for_sender(agrpc::GrpcContext& grpc_context,
+void run_grpc_context_for_sender(agrpc::GrpcContext* grpc_context,
                                  Sender&& sender) {
-  static_assert(
-      std::is_same_v<
-          unifex::sender_single_value_result_t<std::remove_cvref_t<Sender>>,
-          std::variant<std::tuple<>>>);
-  // template <typename Sender>
-  // using sender_single_value_return_type_t =
-  // sender_value_types_t<Sender,single_overload,single_value_type>::type::type;
-  //
-  // template <
-  //     typename Sender,
-  //     template <typename...> class Variant,
-  //     template <typename...> class Tuple>
-  // using sender_value_types_t =
-  //     typename sender_traits<Sender>::template value_types<Variant, Tuple>;
-  //
-  static_assert(!unifex::detail::_has_bulk_sender_types<Sender>);
-  static_assert(unifex::detail::_has_sender_types<Sender>);
-  static_assert(
-      std::is_same_v<
-          typename std::remove_cvref_t<Sender>::template value_types<
-              unifex::single_overload,
-              unifex::single_value_type>,
-          typename unifex::detail::_sender_traits<std::remove_cvref_t<Sender>>::
-              template value_types<unifex::single_overload,
-                                   unifex::single_value_type>>);
-  static_assert(
-      std::is_same_v<typename std::remove_cvref_t<Sender>::template value_types<
-                         unifex::single_overload,
-                         unifex::single_value_type>::type::type,
-                     std::variant<std::tuple<>>>);
-  // std::variant<std::tuple<>>
-  // TypePrinter<
-  //     unifex::sender_single_value_return_type_t<std::remove_cvref_t<Sender>>>
-  //     test;
-
-  grpc_context.work_started();
-  auto x = unifex::when_all(
-      unifex::finally(std::forward<Sender>(sender),
-                      unifex::just_from([&] { grpc_context.work_finished(); })),
-      unifex::just_from([&] { grpc_context.run(); }));
-  static_assert(std::is_same_v<
-                unifex::sender_single_value_result_t<
-                    std::remove_cvref_t<decltype(x)>>,
-                std::tuple<std::variant<std::tuple<std::variant<std::tuple<>>>>,
-                           std::variant<std::tuple<>>>>);
-  unifex::sync_wait(std::move(x));
+  grpc_context->work_started();
+  unifex::sync_wait(unifex::when_all(
+      unifex::finally(std::forward<Sender>(sender), unifex::just_from([&] {
+                        grpc_context->work_finished();
+                      })),
+      unifex::just_from([&] { grpc_context->run(); })));
 }
 
-int main(int argc, const char** argv) {
-  const auto port = argc >= 2 ? argv[1] : "50051";
-  const auto host = std::string("0.0.0.0:") + port;
-
+int main(int argc, char** argv) {
+  gflags::ParseCommandLineFlags(&argc, &argv, /*remove_flags=*/true);
   rocketfs::ClientNamenodeService::AsyncService service;
-  std::unique_ptr<grpc::Server> server;
-
   grpc::ServerBuilder builder;
   agrpc::GrpcContext grpc_context{builder.AddCompletionQueue()};
-  builder.AddListeningPort(host, grpc::InsecureServerCredentials());
+  builder.AddListeningPort(FLAGS_client_namenode_service_listen_address,
+                           grpc::InsecureServerCredentials());
   builder.RegisterService(&service);
-  // agrpc::add_health_check_service(builder);
-  server = builder.BuildAndStart();
-  // agrpc::start_health_check_service(*server, grpc_context);
-
-  static_assert(
-      unifex::detail::_has_sender_types<decltype(register_unary_request_handler(
-          grpc_context, service))>);
-  static_assert(
-      std::is_same_v<
-          typename std::remove_cvref_t<decltype(register_unary_request_handler(
-              grpc_context, service))>::
-              template value_types<unifex::single_overload,
-                                   unifex::single_value_type>::type::type,
-          void>);
-  using Sender = agrpc::detail::RPCHandlerSender<
-      UnaryRPC,
-      decltype([&](UnaryRPC& rpc, const UnaryRPC::Request& request) {
-        return unifex::let_value_with([] { return UnaryRPC::Response{}; },
-                                      [&](auto& response) {
-                                        response.set_pong("pong");
-                                        return rpc.finish(response,
-                                                          grpc::Status::OK);
-                                      });
-      })>;
-  static_assert(std::is_same_v<typename Sender::template value_types<
-                                   unifex::single_overload,
-                                   unifex::single_value_type>::type::type,
-                               void>);
-
+  auto server = builder.BuildAndStart();
   run_grpc_context_for_sender(
-      grpc_context,
-      unifex::with_query_value(unifex::when_all(register_unary_request_handler(
-                                   grpc_context, service)),
-                               unifex::get_scheduler,
-                               unifex::inline_scheduler{}));
+      &grpc_context,
+      unifex::with_query_value(
+          unifex::when_all(
+              register_ping_pong_request_handler(&grpc_context, &service)),
+          unifex::get_scheduler,
+          unifex::inline_scheduler{}));
 }

@@ -116,6 +116,8 @@ set_library_paths(openssl)
 set_library_paths(opentelemetry)
 set_library_paths(prometheus_cpp)
 set_library_paths(protobuf)
+# TODO
+set_library_paths(quill)
 set_library_paths(rocksdb)
 set_library_paths(snappy)
 set_library_paths(zlib)
@@ -446,8 +448,8 @@ ExternalProject_Add(
 ExternalProject_Add(
   protobuf
   PREFIX ${PROTOBUF_PREFIX}
-  GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
-  GIT_TAG v29.2
+  GIT_REPOSITORY https://github.com/rocketfs/protobuf.git
+  GIT_TAG 541298d8227bcef49fbe057f3e4261968dd913e4
   GIT_SHALLOW ON
   GIT_SUBMODULES_RECURSE OFF
   CMAKE_ARGS -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}

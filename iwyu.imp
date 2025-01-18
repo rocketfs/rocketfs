@@ -1,0 +1,10 @@
+[
+  {
+    "include":[
+      "@<agrpc/detail/.*>",
+      "private",
+      "<agrpc/asio_grpc.hpp>",
+      "public"
+    ]
+  }
+]
