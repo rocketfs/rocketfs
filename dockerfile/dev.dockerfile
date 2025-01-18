@@ -7,10 +7,11 @@ FROM debian:bookworm-20241223 AS build
 # Always use `set -eo pipefail`.
 # Fail fast and be aware of exit codes.
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-RUN apt-get update                    &&\
-  apt-get install -y wget=1.21.3-1+b2   \
-  cmake=3.25.1-1 make=4.3-4.1           \
-  gcc=4:12.2.0-3 g++=4:12.2.0-3       &&\
+RUN apt-get update                           &&\
+  apt-get install -y --no-install-recommends   \
+  wget=1.21.3-1+b2                             \
+  cmake=3.25.1-1 make=4.3-4.1                  \
+  gcc=4:12.2.0-3 g++=4:12.2.0-3              &&\
   apt-get clean
 WORKDIR /root
 RUN wget -qO- https://github.com/Kitware/CMake/releases/download/v3.31.3/cmake-3.31.3-linux-x86_64.tar.gz |\
@@ -34,7 +35,7 @@ RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key    |\
   tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc              &&\
   apt-get update                                           &&\
   apt-get install -y --no-install-recommends                 \
-  libllvm-19-ocaml-dev=19.1.4-1~deb12u1                      \
+  libllvm-19-ocaml-dev=1:19.1.4-1~deb12u1                    \
   libllvm19=1:19.1.4-1~deb12u1                               \
   llvm-19=1:19.1.4-1~deb12u1                                 \
   llvm-19-dev=1:19.1.4-1~deb12u1                             \
