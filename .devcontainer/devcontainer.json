@@ -1,14 +1,15 @@
 {
-    "image": "rocketio/dev:20250101",
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "ms-vscode.cpptools-extension-pack",
-                "xaver.clang-format",
-                "ms-azuretools.vscode-docker",
-                "GitHub.vscode-github-actions",
-                "MarsCode.marscode-extension"
-            ]
-        }
+  "image": "rocketio/dev:20250101",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools-extension-pack",
+        "ms-azuretools.vscode-docker",
+        "xaver.clang-format",
+        "esbenp.prettier-vscode",
+        "GitHub.vscode-github-actions",
+        "MarsCode.marscode-extension"
+      ]
     }
+  }
 }
