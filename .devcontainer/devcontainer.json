@@ -1,5 +1,5 @@
 {
-  "image": "rocketio/dev:20250101",
+  "image": "rocketfs726673/dev:main",
   "customizations": {
     "vscode": {
       "extensions": [

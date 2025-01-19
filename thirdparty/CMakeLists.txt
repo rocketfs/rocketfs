@@ -111,6 +111,7 @@ set_library_paths(openssl)
 set_library_paths(opentelemetry)
 set_library_paths(prometheus_cpp)
 set_library_paths(protobuf)
+set_library_paths(quill)
 set_library_paths(rocksdb)
 set_library_paths(snappy)
 set_library_paths(zlib)
@@ -127,7 +128,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${ABSEIL_OUTPUT}
              -DABSL_PROPAGATE_CXX_STD=ON
              -DABSL_BUILD_TESTING=OFF
@@ -148,7 +149,7 @@ ExternalProject_Add(
              # -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${ASIO_GRPC_OUTPUT}
   LOG_CONFIGURE ON
   LOG_BUILD ON
@@ -166,7 +167,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${CURL_OUTPUT}
              -DOPENSSL_ROOT_DIR=${OPENSSL_OUTPUT}
              -DBUILD_SHARED_LIBS=OFF
@@ -189,7 +190,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${FLATBUFFERS_OUTPUT}
              -DFLATBUFFERS_CPP_STD=${CMAKE_CXX_STANDARD}
              -DFLATBUFFERS_LIBCXX_WITH_CLANG=OFF
@@ -210,7 +211,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${FMT_OUTPUT}
   LOG_CONFIGURE ON
   LOG_BUILD ON
@@ -228,7 +229,7 @@ ExternalProject_Add(
              # -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${GFLAGS_OUTPUT}
              -DBUILD_STATIC_LIBS=ON
              -DBUILD_TESTING=OFF
@@ -248,7 +249,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${GOOGLETEST_OUTPUT}
   LOG_CONFIGURE ON
   LOG_BUILD ON
@@ -267,7 +268,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${GRPC_OUTPUT}
              -DgRPC_ABSL_PROVIDER=package
              -Dabsl_DIR=${ABSEIL_OUTPUT}/lib/cmake/absl
@@ -328,7 +329,7 @@ ExternalProject_Add(
              # -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${JSON_OUTPUT})
 
 ExternalProject_Add(
@@ -342,10 +343,8 @@ ExternalProject_Add(
              # -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${LIBUNIFEX_OUTPUT}
-             -DUNIFEX_NO_ASYNC_STACKS=ON
-             -DUNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF
              -DBUILD_TESTING=OFF
              -DUNIFEX_BUILD_EXAMPLES=OFF)
 
@@ -392,7 +391,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${OPENTELEMETRY_OUTPUT}
              -DWITH_ABSEIL=ON
              -Dabsl_DIR=${ABSEIL_OUTPUT}/lib/cmake/absl
@@ -402,6 +401,8 @@ ExternalProject_Add(
              -DOPENSSL_ROOT_DIR=${OPENSSL_OUTPUT}
              -DProtobuf_DIR=${PROTOBUF_OUTPUT}/lib/cmake/protobuf
              -Dutf8_range_DIR=${PROTOBUF_OUTPUT}/lib/cmake/utf8_range
+             -DZLIB_INCLUDE_DIR=${ZLIB_OUTPUT}/include
+             -DZLIB_LIBRARY=${ZLIB_OUTPUT}/lib/libz.a
              -DWITH_OPENTRACING=OFF
              -DWITH_OTLP_GRPC=ON
              -DWITH_OTLP_FILE=ON
@@ -413,7 +414,14 @@ ExternalProject_Add(
   LOG_BUILD ON
   LOG_INSTALL ON
   LOG_OUTPUT_ON_FAILURE ON)
-add_dependencies(opentelemetry abseil curl grpc openssl protobuf)
+add_dependencies(
+  opentelemetry
+  abseil
+  curl
+  grpc
+  openssl
+  protobuf
+  zlib)
 
 ExternalProject_Add(
   prometheus-cpp
@@ -427,7 +435,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${PROMETHEUS_CPP_OUTPUT}
              -DENABLE_PUSH=OFF
              -DENABLE_COMPRESSION=OFF
@@ -450,7 +458,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${PROTOBUF_OUTPUT}
              -Dprotobuf_LOCAL_DEPENDENCIES_ONLY=ON
              -Dprotobuf_ABSL_PROVIDER=package
@@ -467,6 +475,22 @@ ExternalProject_Add(
 add_dependencies(protobuf abseil zlib)
 
 ExternalProject_Add(
+  quill
+  PREFIX ${QUILL_PREFIX}
+  GIT_REPOSITORY https://github.com/odygrd/quill.git
+  GIT_TAG v8.0.0
+  GIT_SHALLOW ON
+  CMAKE_ARGS -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+             -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+             -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
+             -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
+             -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+             -DCMAKE_BUILD_TYPE=Release
+             -DCMAKE_INSTALL_PREFIX=${QUILL_OUTPUT}
+             -DQUILL_NO_EXCEPTIONS=ON
+             -DQUILL_ENABLE_INSTALL=ON)
+
+ExternalProject_Add(
   rocksdb
   PREFIX ${ROCKSDB_PREFIX}
   GIT_REPOSITORY https://github.com/facebook/rocksdb.git
@@ -478,7 +502,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${ROCKSDB_OUTPUT}
              -DWITH_GFLAGS=ON
              -Dgflags_DIR=${GFLAGS_OUTPUT}/lib/cmake/gflags
@@ -488,6 +512,7 @@ ExternalProject_Add(
              -DWITH_ZSTD=ON
              -DZSTD_INCLUDE_DIRS=${ZSTD_OUTPUT}/include
              -DZSTD_LIBRARIES=${ZSTD_OUTPUT}/lib/libzstd.a
+             -DFAIL_ON_WARNINGS=OFF
              -DROCKSDB_BUILD_SHARED=OFF
              -DUSE_RTTI=ON
              -DWITH_TOOLS=ON
@@ -509,7 +534,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${SNAPPY_OUTPUT}
              -DSNAPPY_BUILD_TESTS=OFF
   LOG_CONFIGURE ON
@@ -529,7 +554,7 @@ ExternalProject_Add(
              -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
-             -DCMAKE_BUILD_TYPE=RelWithDebInfo
+             -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${ZLIB_OUTPUT}
   LOG_CONFIGURE ON
   LOG_BUILD ON
@@ -547,7 +572,7 @@ ExternalProject_Add(
     -G${CMAKE_GENERATOR} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
     -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
     -DCMAKE_C_FLAGS=${SANITIZER_FLAGS} -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
-    -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD} -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD} -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_INSTALL_PREFIX=${ZSTD_OUTPUT}
   LOG_CONFIGURE ON
   LOG_BUILD ON
