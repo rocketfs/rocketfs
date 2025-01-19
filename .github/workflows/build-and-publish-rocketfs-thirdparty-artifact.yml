@@ -1,0 +1,97 @@
+name: Build and publish RocketFS thirdparty artifact
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    container: rocketfs726673/dev:main
+    strategy:
+      fail-fast: true
+      matrix:
+        os:
+          - ubuntu-latest
+        c_compiler:
+          - clang
+          - gcc
+        cpp_compiler:
+          - clang++
+          - g++
+        enable_undefined_behavior_sanitizer:
+          - ON
+          - OFF
+        enable_address_sanitizer:
+          - ON
+          - OFF
+        enable_thread_sanitizer:
+          - ON
+          - OFF
+        include:
+          - os: ubuntu-latest
+            enable_undefined_behavior_sanitizer: ON
+            enable_address_sanitizer: ON
+            enable_thread_sanitizer: OFF
+            c_compiler: clang
+            cpp_compiler: clang++
+          - os: ubuntu-latest
+            enable_undefined_behavior_sanitizer: OFF
+            enable_address_sanitizer: OFF
+            enable_thread_sanitizer: ON
+            c_compiler: clang
+            cpp_compiler: clang++
+          - os: ubuntu-latest
+            enable_undefined_behavior_sanitizer: OFF
+            enable_address_sanitizer: OFF
+            enable_thread_sanitizer: OFF
+            c_compiler: clang
+            cpp_compiler: clang++
+          - os: ubuntu-latest
+            enable_undefined_behavior_sanitizer: OFF
+            enable_address_sanitizer: OFF
+            enable_thread_sanitizer: OFF
+            c_compiler: gcc
+            cpp_compiler: g++
+        exclude:
+          - c_compiler: clang
+            cpp_compiler: g++
+          - c_compiler: gcc
+            cpp_compiler: clang++
+          # Bind Undefined Behavior Sanitizer and Address Sanitizer together
+          # to reduce the number of artifact combinations.
+          - enable_undefined_behavior_sanitizer: ON
+            enable_address_sanitizer: OFF
+          - enable_undefined_behavior_sanitizer: OFF
+            enable_address_sanitizer: ON
+          # Address Sanitizer and Thread Sanitizer cannot be enabled simultaneously.
+          - enable_address_sanitizer: ON
+            enable_thread_sanitizer: ON
+          # If using GCC, do not enable any sanitizers.
+          - c_compiler: gcc
+            enable_undefined_behavior_sanitizer: ON
+          - c_compiler: gcc
+            enable_address_sanitizer: ON
+          - c_compiler: gcc
+            enable_thread_sanitizer: ON
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set short commit ID
+        id: strings
+        run: echo "commit-id=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - name: Configure CMake
+        run: >
+          cmake
+          -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
+          -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
+          -DENABLE_UNDEFINED_BEHAVIOR_SANITIZER=${{ matrix.enable_undefined_behavior_sanitizer }}
+          -DENABLE_ADDRESS_SANITIZER=${{ matrix.enable_address_sanitizer }}
+          -DENABLE_THREAD_SANITIZER=${{ matrix.enable_thread_sanitizer }}
+          -B ${GITHUB_WORKSPACE}/build
+          -S ${GITHUB_WORKSPACE}/thirdparty
+      - name: Build
+        run: cmake --build ${GITHUB_WORKSPACE}/build -- -j$(nproc)
+      - name: Archive artifact
+        run: tar -czvf thirdparty-artifact-${{ steps.strings.outputs.commit-id }}.tar.gz -C ${{ github.workspace }}/build/output/* .
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: thirdparty-artifact-${{ steps.strings.outputs.commit-id }}
+          path: thirdparty-artifact-${{ steps.strings.outputs.commit-id }}.tar.gz

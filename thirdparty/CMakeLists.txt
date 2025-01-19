@@ -14,7 +14,7 @@
 #   * Finally, options that disable shared libraries and tests, e.g.,
 #     `-Dprotobuf_BUILD_SHARED_LIBS=OFF` and `-Dprotobuf_BUILD_TESTS=OFF`.
 
-cmake_minimum_required(VERSION 3.31)
+cmake_minimum_required(VERSION 3.25)
 
 project(
   RocketFSThirdParty
@@ -61,15 +61,11 @@ set(ENABLE_UNDEFINED_BEHAVIOR_SANITIZER
 set(ENABLE_ADDRESS_SANITIZER
     OFF
     CACHE BOOL "Enable address sanitizer.")
-set(ENABLE_MEMORY_SANITIZER
-    OFF
-    CACHE BOOL "Enable memory sanitizer.")
 set(ENABLE_THREAD_SANITIZER
     OFF
     CACHE BOOL "Enable thread sanitizer.")
 if(ENABLE_UNDEFINED_BEHAVIOR_SANITIZER
    OR ENABLE_ADDRESS_SANITIZER
-   OR ENABLE_MEMORY_SANITIZER
    OR ENABLE_THREAD_SANITIZER)
   set(SANITIZER_FLAGS
       # https://github.com/google/sanitizers/wiki/addresssanitizerflags
@@ -84,7 +80,6 @@ if(ENABLE_UNDEFINED_BEHAVIOR_SANITIZER
       $<$<STREQUAL:${CMAKE_CXX_COMPILER_ID},Clang>:-frecord-command-line>
       $<$<BOOL:${ENABLE_UNDEFINED_BEHAVIOR_SANITIZER}>:-fsanitize=undefined>
       $<$<BOOL:${ENABLE_ADDRESS_SANITIZER}>:-fsanitize=address>
-      $<$<BOOL:${ENABLE_MEMORY_SANITIZER}>:-fsanitize=memory>
       $<$<BOOL:${ENABLE_THREAD_SANITIZER}>:-fsanitize=thread>)
   list(JOIN SANITIZER_FLAGS " " SANITIZER_FLAGS)
 endif()
