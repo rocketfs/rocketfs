@@ -1,4 +1,4 @@
-name: Build and publish RocketFS thirdparty artifact
+name: Build and publish RocketFS third party artifact
 on:
   workflow_dispatch:
 jobs:
@@ -78,7 +78,7 @@ jobs:
       - name: Set artifact name
         id: vars
         run: |
-          echo "artifact-name=thirdparty-artifact-$(git -C ${GITHUB_WORKSPACE} rev-parse --short HEAD)-${{ matrix.cpp_compiler }}-asan=${{ matrix.enable_address_sanitizer }}-tsan=${{ matrix.enable_thread_sanitizer }}" >> ${GITHUB_OUTPUT}
+          echo "artifact-name=third-party-artifact-$(git -C ${GITHUB_WORKSPACE} rev-parse --short HEAD)-${{ matrix.cpp_compiler }}-asan-${{ matrix.enable_address_sanitizer }}-tsan-${{ matrix.enable_thread_sanitizer }}" >> ${GITHUB_OUTPUT}
       - name: Configure CMake
         run: >
           cmake
@@ -88,9 +88,9 @@ jobs:
           -DENABLE_ADDRESS_SANITIZER=${{ matrix.enable_address_sanitizer }}
           -DENABLE_THREAD_SANITIZER=${{ matrix.enable_thread_sanitizer }}
           -B ${GITHUB_WORKSPACE}/build
-          -S ${GITHUB_WORKSPACE}/thirdparty
+          -S ${GITHUB_WORKSPACE}/third_party
       - name: Build
-        run: cmake --build ${GITHUB_WORKSPACE}/build -- -j$(nproc)
+        run: cmake --build ${GITHUB_WORKSPACE}/build --target install -- -j$(nproc)
       - name: Archive artifact
         run: tar -czvf ${{ steps.vars.outputs.artifact-name }}.tar.gz -C ${GITHUB_WORKSPACE}/build/output .
       - name: Upload artifact
