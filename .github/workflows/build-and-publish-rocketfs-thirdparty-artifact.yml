@@ -73,9 +73,12 @@ jobs:
             enable_thread_sanitizer: ON
     steps:
       - uses: actions/checkout@v4
-      - name: Set short commit ID
-        id: strings
-        run: echo "commit-id=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory ${GITHUB_WORKSPACE}
+      - name: Set artifact name
+        id: vars
+        run: |
+          echo "artifact-name=thirdparty-artifact-$(git -C ${GITHUB_WORKSPACE} rev-parse --short HEAD)-${{ matrix.cpp_compiler }}-asan=${{ matrix.enable_address_sanitizer }}-tsan=${{ matrix.enable_thread_sanitizer }}" >> ${GITHUB_OUTPUT}
       - name: Configure CMake
         run: >
           cmake
@@ -89,9 +92,9 @@ jobs:
       - name: Build
         run: cmake --build ${GITHUB_WORKSPACE}/build -- -j$(nproc)
       - name: Archive artifact
-        run: tar -czvf thirdparty-artifact-${{ steps.strings.outputs.commit-id }}.tar.gz -C ${{ github.workspace }}/build/output/* .
+        run: tar -czvf ${{ steps.vars.outputs.artifact-name }}.tar.gz -C ${GITHUB_WORKSPACE}/build/output .
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: thirdparty-artifact-${{ steps.strings.outputs.commit-id }}
-          path: thirdparty-artifact-${{ steps.strings.outputs.commit-id }}.tar.gz
+          name: ${{ steps.vars.outputs.artifact-name }}
+          path: ${{ steps.vars.outputs.artifact-name }}.tar.gz

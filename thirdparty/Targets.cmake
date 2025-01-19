@@ -18,6 +18,7 @@ list(
   ${CMAKE_CURRENT_LIST_DIR}/prometheus_cpp/lib/cmake/prometheus-cpp
   ${CMAKE_CURRENT_LIST_DIR}/protobuf/lib/cmake/protobuf
   ${CMAKE_CURRENT_LIST_DIR}/protobuf/lib/cmake/utf8_range
+  ${CMAKE_CURRENT_LIST_DIR}/quill/lib/cmake/quill
   ${CMAKE_CURRENT_LIST_DIR}/rocksdb/lib/cmake/rocksdb
   ${CMAKE_CURRENT_LIST_DIR}/snappy/lib/cmake/Snappy
   ${CMAKE_CURRENT_LIST_DIR}/zstd/lib/cmake/zstd)
