@@ -1,4 +1,4 @@
 /build*/**
-/thirdparty/build*/**
+/third_party/build*/**
 /.vscode/**
 /src/proto/generated/**

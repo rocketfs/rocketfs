@@ -579,5 +579,10 @@ ExternalProject_Add(
   LOG_INSTALL ON
   LOG_OUTPUT_ON_FAILURE ON)
 
-install(FILES ${CMAKE_SOURCE_DIR}/Targets.cmake
-        DESTINATION ${CMAKE_BINARY_DIR}/output)
+install(
+  FILES ${CMAKE_SOURCE_DIR}/gtest-parallelConfig.cmake
+        ${CMAKE_SOURCE_DIR}/jemallocConfig.cmake
+        ${CMAKE_SOURCE_DIR}/libunwindConfig.cmake
+        ${CMAKE_SOURCE_DIR}/Targets.cmake
+        ${CMAKE_SOURCE_DIR}/ZLIBConfig.cmake
+  DESTINATION ${CMAKE_BINARY_DIR}/output)
