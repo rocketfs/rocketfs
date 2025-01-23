@@ -29,9 +29,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-list(APPEND CMAKE_MODULE_PATH
-     ${CMAKE_CURRENT_LIST_DIR}/thirdparty/builds/output
-     ${CMAKE_CURRENT_LIST_DIR}/cmake)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
+include(ThirdPartyFetcher)
+include(ModuleFinder)
+include(ProtobufGenerator)
+include(StatusReturnAnalyzer)
 
 find_program(IWYU_EXECUTABLE include-what-you-use REQUIRED)
 set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${IWYU_EXECUTABLE})
@@ -40,20 +42,12 @@ set(CMAKE_CXX_CPPLINT ${CPPLINT_EXECUTABLE})
 find_program(CLANG_TIDY_EXECUTABLE clang-tidy REQUIRED)
 set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXECUTABLE})
 
-include(Targets)
-include(StatusReturnAnalyzer)
-include(ProtobufGenerator)
-
-find_package(OpenSSL CONFIG REQUIRED)
-find_package(gRPC CONFIG REQUIRED)
-find_package(asio-grpc CONFIG REQUIRED)
-find_package(unifex CONFIG REQUIRED)
-
 file(GLOB_RECURSE NAMENODE_SRCS ${CMAKE_SOURCE_DIR}/src/namenode/*.cc)
 add_executable(namenode_executable ${NAMENODE_SRCS})
 target_link_libraries(
   namenode_executable
-  PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex unifex::unifex
+  PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex
+          unifex::unifex
   PRIVATE -fsanitize=address,undefined)
 target_compile_definitions(
   namenode_executable
@@ -64,7 +58,8 @@ file(GLOB_RECURSE CLIENT_SRCS ${CMAKE_SOURCE_DIR}/src/client/*.cc)
 add_executable(client_executable ${CLIENT_SRCS})
 target_link_libraries(
   client_executable
-  PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex unifex::unifex
+  PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex
+          unifex::unifex
   PRIVATE -fsanitize=address,undefined)
 target_compile_definitions(
   client_executable
