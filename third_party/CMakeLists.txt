@@ -61,11 +61,15 @@ set(ENABLE_UNDEFINED_BEHAVIOR_SANITIZER
 set(ENABLE_ADDRESS_SANITIZER
     OFF
     CACHE BOOL "Enable address sanitizer.")
+set(ENABLE_REALTIME_SANITIZER
+    OFF
+    CACHE BOOL "Enable realtime sanitizer.")
 set(ENABLE_THREAD_SANITIZER
     OFF
     CACHE BOOL "Enable thread sanitizer.")
 if(ENABLE_UNDEFINED_BEHAVIOR_SANITIZER
    OR ENABLE_ADDRESS_SANITIZER
+   OR ENABLE_REALTIME_SANITIZER
    OR ENABLE_THREAD_SANITIZER)
   set(SANITIZER_FLAGS
       # https://github.com/google/sanitizers/wiki/addresssanitizerflags
@@ -80,6 +84,7 @@ if(ENABLE_UNDEFINED_BEHAVIOR_SANITIZER
       $<$<STREQUAL:${CMAKE_CXX_COMPILER_ID},Clang>:-frecord-command-line>
       $<$<BOOL:${ENABLE_UNDEFINED_BEHAVIOR_SANITIZER}>:-fsanitize=undefined>
       $<$<BOOL:${ENABLE_ADDRESS_SANITIZER}>:-fsanitize=address>
+      $<$<BOOL:${ENABLE_REALTIME_SANITIZER}>:-fsanitize=realtime>
       $<$<BOOL:${ENABLE_THREAD_SANITIZER}>:-fsanitize=thread>)
   list(JOIN SANITIZER_FLAGS " " SANITIZER_FLAGS)
 endif()
