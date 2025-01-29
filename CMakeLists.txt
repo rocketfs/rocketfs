@@ -5,11 +5,20 @@ project(
   VERSION 1.0
   LANGUAGES CXX)
 
-if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  message(FATAL_ERROR "RocketFS requires Clang as the compiler.")
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "Please Ensure compilation on a Linux system.")
 endif()
-if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19)
-  message(FATAL_ERROR "RocketFS requires Clang version 19 or higher.")
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12.2)
+    message(FATAL_ERROR "g++ 12 or greater is required.")
+  endif()
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL Clang)
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0)
+    message(FATAL_ERROR "Clang++ 19 or greater is required.")
+  endif()
+else()
+  message(FATAL_ERROR "Only g++ and clang++ are supported.")
 endif()
 
 if(NOT CMAKE_C_COMPILER)
@@ -31,37 +40,44 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 include(ThirdPartyFetcher)
-include(ModuleFinder)
+include(ThirdPartyFinder)
 include(ProtobufGenerator)
-include(StatusReturnAnalyzer)
 
 find_program(IWYU_EXECUTABLE include-what-you-use REQUIRED)
-set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${IWYU_EXECUTABLE})
+set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE
+    ${IWYU_EXECUTABLE}
+    -Xiwyu
+    --mapping_file=${CMAKE_SOURCE_DIR}/iwyu.json
+    -Xiwyu
+    --no_comments
+    -Xiwyu
+    --no_fwd_decls)
 find_program(CPPLINT_EXECUTABLE cpplint REQUIRED)
-set(CMAKE_CXX_CPPLINT ${CPPLINT_EXECUTABLE})
+set(CMAKE_CXX_CPPLINT ${CPPLINT_EXECUTABLE}
+                      --filter=-whitespace/indent_namespace)
 find_program(CLANG_TIDY_EXECUTABLE clang-tidy REQUIRED)
 set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXECUTABLE})
 
-file(GLOB_RECURSE NAMENODE_SRCS ${CMAKE_SOURCE_DIR}/src/namenode/*.cc)
-add_executable(namenode_executable ${NAMENODE_SRCS})
+include_directories(src)
+file(GLOB_RECURSE srcs ${CMAKE_SOURCE_DIR}/src/*.cc)
+list(FILTER srcs EXCLUDE REGEX "_main\\.cc$")
+add_library(rocketfs STATIC ${srcs})
 target_link_libraries(
-  namenode_executable
-  PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex
-          unifex::unifex
-  PRIVATE -fsanitize=address,undefined)
+  rocketfs
+  PUBLIC RocksDB::rocksdb
+         asio-grpc::asio-grpc-unifex
+         fmt::fmt-header-only
+         gRPC::grpc++
+         gRPC::grpc++_unsecure
+         gflags::gflags_static
+         protos
+         quill::quill
+         unifex::unifex)
 target_compile_definitions(
-  namenode_executable
-  PRIVATE UNIFEX_NO_ASYNC_STACKS
-  PRIVATE UNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF)
+  rocketfs
+  PUBLIC UNIFEX_NO_ASYNC_STACKS
+  PUBLIC UNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF)
 
-file(GLOB_RECURSE CLIENT_SRCS ${CMAKE_SOURCE_DIR}/src/client/*.cc)
-add_executable(client_executable ${CLIENT_SRCS})
-target_link_libraries(
-  client_executable
-  PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex
-          unifex::unifex
-  PRIVATE -fsanitize=address,undefined)
-target_compile_definitions(
-  client_executable
-  PRIVATE UNIFEX_NO_ASYNC_STACKS
-  PRIVATE UNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF)
+file(GLOB_RECURSE test-srcs ${CMAKE_SOURCE_DIR}/test/*_test.cc)
+add_executable(test ${test-srcs})
+target_link_libraries(test PUBLIC rocketfs GTest::gtest_main)

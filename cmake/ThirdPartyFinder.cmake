@@ -23,5 +23,8 @@ find_package(zstd CONFIG REQUIRED)
 get_target_property(ZSTD_INCLUDE_DIRS zstd::libzstd
                     INTERFACE_INCLUDE_DIRECTORIES)
 get_target_property(ZSTD_LIBRARIES zstd::libzstd INTERFACE_LINK_LIBRARIES)
+# RocksDB depends on `zstd::zstd`, but Zstandard only provides `zstd::libzstd`.
+# Create an alias to map `zstd::zstd` to `zstd::libzstd` for compatibility.
+add_library(zstd::zstd ALIAS zstd::libzstd)
 find_package(Snappy CONFIG REQUIRED)
 find_package(RocksDB CONFIG REQUIRED)
