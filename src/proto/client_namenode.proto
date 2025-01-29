@@ -19,7 +19,7 @@ message MkdirsResponse {
 
 // https://github.com/apache/hadoop/blob/266dad1617d599f7d247b54d03b4741f85cd6460/hadoop-hdfs-project/hadoop-hdfs-client/src/main/proto/ClientNamenodeProtocol.proto#
 service ClientNamenodeService {
-  rpc ping_pong(PingRequest) returns (PongResponse);
+  rpc PingPong(PingRequest) returns (PongResponse);
 
-  // rpc mkdirs(MkdirsRequest) returns (MkdirsResponse);
+  rpc Mkdirs(MkdirsRequest) returns (MkdirsResponse);
 }

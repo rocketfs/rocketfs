@@ -31,7 +31,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 include(ThirdPartyFetcher)
-include(ModuleFinder)
+include(ThirdPartyFinder)
 include(ProtobufGenerator)
 include(StatusReturnAnalyzer)
 
@@ -42,26 +42,28 @@ set(CMAKE_CXX_CPPLINT ${CPPLINT_EXECUTABLE})
 find_program(CLANG_TIDY_EXECUTABLE clang-tidy REQUIRED)
 set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXECUTABLE})
 
-file(GLOB_RECURSE NAMENODE_SRCS ${CMAKE_SOURCE_DIR}/src/namenode/*.cc)
-add_executable(namenode_executable ${NAMENODE_SRCS})
+include_directories(src)
+
+file(GLOB_RECURSE NAMENODE_SRCS ${CMAKE_SOURCE_DIR}/src/namenode/*.cc ${CMAKE_SOURCE_DIR}/src/common/*.cc)
+add_executable(namenode ${NAMENODE_SRCS})
 target_link_libraries(
-  namenode_executable
+  namenode
   PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex
-          unifex::unifex
+          unifex::unifex quill::quill RocksDB::rocksdb
   PRIVATE -fsanitize=address,undefined)
 target_compile_definitions(
-  namenode_executable
+  namenode
   PRIVATE UNIFEX_NO_ASYNC_STACKS
   PRIVATE UNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF)
 
 file(GLOB_RECURSE CLIENT_SRCS ${CMAKE_SOURCE_DIR}/src/client/*.cc)
-add_executable(client_executable ${CLIENT_SRCS})
+add_executable(client ${CLIENT_SRCS})
 target_link_libraries(
-  client_executable
+  client
   PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex
           unifex::unifex
   PRIVATE -fsanitize=address,undefined)
 target_compile_definitions(
-  client_executable
+  client
   PRIVATE UNIFEX_NO_ASYNC_STACKS
   PRIVATE UNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF)

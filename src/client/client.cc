@@ -22,14 +22,13 @@ unifex::task<void> make_unary_request(
     agrpc::GrpcContext& grpc_context,
     rocketfs::ClientNamenodeService::Stub& stub) {
   using RPC = agrpc::ClientRPC<
-      &rocketfs::ClientNamenodeService::Stub::PrepareAsyncping_pong>;
+      &rocketfs::ClientNamenodeService::Stub::PrepareAsyncPingPong>;
 
   grpc::ClientContext client_context;
   client_context.set_deadline(std::chrono::system_clock::now() +
                               std::chrono::seconds(5));
 
   rocketfs::PingRequest request;
-  // request.set_integer(42);
   rocketfs::PongResponse response;
   const auto status = co_await RPC::request(
       grpc_context, stub, client_context, request, response);
@@ -39,7 +38,7 @@ unifex::task<void> make_unary_request(
 }
 
 using ServerStreamingClientRPC = agrpc::ClientRPC<
-    &rocketfs::ClientNamenodeService::Stub::PrepareAsyncping_pong>;
+    &rocketfs::ClientNamenodeService::Stub::PrepareAsyncPingPong>;
 
 struct ReadContext {
   rocketfs::PongResponse response;

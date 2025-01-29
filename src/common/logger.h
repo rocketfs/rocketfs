@@ -1,0 +1,17 @@
+#include <quill/Logger.h>
+
+namespace rocketfs {
+
+extern quill::Logger* logger;
+
+}  // namespace rocketfs
+
+#define CHECK(condition)                                    \
+  do {                                                      \
+    if (!(condition)) {                                     \
+      LOG_CRITICAL(logger, "Check failed: {}." #condition); \
+    }                                                       \
+  } while (0)
+
+#define CHECK_NOTNULL(ptr) CHECK((ptr) != nullptr)
+#define CHECK_LT(lhs, rhs) CHECK((lhs) < (rhs))

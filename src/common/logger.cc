@@ -1,0 +1,12 @@
+#include "common/logger.h"
+
+#include <quill/Frontend.h>
+#include <quill/Logger.h>
+#include <quill/sinks/ConsoleSink.h>
+
+namespace rocketfs {
+
+quill::Logger* logger = quill::Frontend::create_or_get_logger(
+    "root", quill::Frontend::create_or_get_sink<quill::ConsoleSink>("sink"));
+
+}  // namespace rocketfs
