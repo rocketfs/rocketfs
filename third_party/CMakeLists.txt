@@ -340,8 +340,8 @@ ExternalProject_Add(
 ExternalProject_Add(
   libunifex
   PREFIX ${LIBUNIFEX_PREFIX}
-  GIT_REPOSITORY https://github.com/facebookexperimental/libunifex.git
-  GIT_TAG fdd2c2313ce0b65cae2dde4a048c41f7144a3024
+  GIT_REPOSITORY https://github.com/rocketfs/libunifex.git
+  GIT_TAG ed9739883cc143050acfe7c3e7cceaeffbea5543
   GIT_SHALLOW ON
   CMAKE_ARGS # -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
              -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}

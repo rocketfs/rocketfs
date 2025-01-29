@@ -78,7 +78,7 @@ jobs:
       - name: Set artifact name
         id: vars
         run: |
-          echo "artifact-name=third-party-artifact-$(git -C ${GITHUB_WORKSPACE} rev-parse --short HEAD)-${{ matrix.cpp_compiler }}-asan-${{ matrix.enable_address_sanitizer }}-tsan-${{ matrix.enable_thread_sanitizer }}" >> ${GITHUB_OUTPUT}
+          echo "artifact-name=third-party-artifact-$(git -C ${GITHUB_WORKSPACE} rev-parse --short HEAD)-${{ matrix.c_compiler }}-asan-${{ matrix.enable_address_sanitizer }}-tsan-${{ matrix.enable_thread_sanitizer }}" >> ${GITHUB_OUTPUT}
       - name: Configure CMake
         run: >
           cmake
