@@ -65,7 +65,7 @@ This protocol is inspired by Paxos, a consensus protocol that ensures agreement 
       1. It updates `d.ChunkID(b)`, `d.VotedGS(b,c)`, and stores `data` in `d.VotedData(b,c)`.
       2. It sends a `Vote(d,b,gs,c)` response to the client.
 4. The client waits for `success=true` responses from all DataNodes in `[d]` before moving to the next chunk.
-5. After writing all chunks, the client sends a `NameNode.FinalizeBlock(b,length)` request.
+5. Once all chunks are written successfully, the client finalizes the block by sending a `NameNode.FinalizeBlock(b,length)` request to the NameNode.
 6. If the NameNode responds with `success=true`, the block is successfully written.
 
 ### Failure Recovery Process
@@ -77,8 +77,8 @@ This protocol is inspired by Paxos, a consensus protocol that ensures agreement 
    - Chooses the chunk with the highest-numbered `c` , then choose the highest-numbered `vgs` and the corresponding `vdata` for that chunk.
    - If no valid data exists, it finalized the block with zero length.
 5. The NameNode sends `write(b,gs=n.GS(b),c,vdata)` to all DataNodes.
-6. Upon receiving `Write(b,gs,c,vdata)`, DataNode `d` processes the request as follows: 
-   1. If `d.MaxGS(b)==gs && (c>=d.ChunkID(b)-1 && c<=d.ChunkID(b)+1)` 
+6. Upon receiving `Write(b,gs,c,vdata)`, DataNode `d` processes the request as follows:
+   1. If `d.MaxGS(b)==gs && (c>=d.ChunkID(b)-1 && c<=d.ChunkID(b)+1)`
       1. Updates `d.ChunkID(b)` to `max(c,d.ChunkID(b))`, sets `d.VotedGS(b,c)` to `gs`, and stores `vdata` in `d.VotedData(b,c)`.
       2. Responds with `Vote(d,b,gs,c)`.
 7. The NameNode finalizes the block after receiving `Vote` responses from a majority quorum and returns the block's length to the client.
@@ -110,26 +110,26 @@ This protocol is inspired by Paxos, a consensus protocol that ensures agreement 
 
 To ensure correctness, this protocol adapts Paxos and introduces additional constraints. Below, we map the protocol terminology to Paxos and demonstrate how it satisfies Agreement, Progress, and Linearizability.
 
-| Protocol Terminology           | Paxos Terminology           | Description                                                  |
-| ------------------------------ | --------------------------- | ------------------------------------------------------------ |
-| `BlockInputStream`             | A series of Paxos instances | A sequence of chunks within the same block.                  |
+| Protocol Terminology           | Paxos Terminology           | Description                                                                                                                                               |
+| ------------------------------ | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BlockInputStream`             | A series of Paxos instances | A sequence of chunks within the same block.                                                                                                               |
 | Chunk                          | Paxos instance              | When a user calls `flush` or the batch size reaches a threshold, the client sends the data as a chunk. Each chunk must achieve consensus among DataNodes. |
-| Generation                     | Round                       |                                                              |
-| Initial Generation             |                             | The generation where `stamp = 0`. The client acts as the proposer to propose data directly to DataNodes. |
-| Recovery Generation            |                             | The generation where `stamp > 0`. The NameNode acts as the proposer. |
-|                                | Proposer                    |                                                              |
-| DataNode                       | Acceptor                    | Votes on proposed chunks and stores the data.                |
-|                                | Learner                     | Learns the final value during normal operations or recovery. |
-| `d.ChunkID(b)`                 |                             |                                                              |
-| `d.MaxGS(b)`                   | `val(a)`                    | The highest-numbered generation in which the DataNode `d` has participated for block `b`. |
-| `d.VotedGS(b,c)`               | `vrnd(a)`                   | The highest-numbered generation in which the DataNode `d` has cast a vote for block `b` chunk `c`. |
-| `d.VotedData(b,c)`             | `vval(a)`                   | The chunk data that the DataNode `d` voted to accept in `d.VotedGS(b,c)`. |
-| `n.GS(b)`                      | `crnd(c)`                   | The highest-numbered generation that the NameNode has initiated for block `b`. |
-| `n.Data(b,c)`                  | `cval(c)`                   | The chunk data that the NameNode has picked for block `b` chunk `c` in generation `n.GS(b,c)`. |
-| `NextGS(b,gs)`                 | Phase 1a message            | A prepare message sent by the NameNode to DataNodes, requesting their participation in generation `gs` for block `b`. |
-| `LastVote(d,b,gs,c,vgs,vdata)` | Phase 1b message            | A response from DataNode `d` to the proposer, containing their last vote generation `vgs` and data `vdata` of last chunk `c`. |
-| `Write(b,gs,c,data)`           | Phase 2a message            | A message sent by the client or the NameNode to DataNodes, requesting them to vote on the proposed data. |
-| `Vote(d,b,gs,c)`               | Phase 2b message            | A message from a DataNode `d` announcing its vote for the proposed value in the given generation `gs`. |
+| Generation                     | Round                       |                                                                                                                                                           |
+| Initial Generation             |                             | The generation where `stamp = 0`. The client acts as the proposer to propose data directly to DataNodes.                                                  |
+| Recovery Generation            |                             | The generation where `stamp > 0`. The NameNode acts as the proposer.                                                                                      |
+|                                | Proposer                    |                                                                                                                                                           |
+| DataNode                       | Acceptor                    | Votes on proposed chunks and stores the data.                                                                                                             |
+|                                | Learner                     | Learns the final value during normal operations or recovery.                                                                                              |
+| `d.ChunkID(b)`                 |                             |                                                                                                                                                           |
+| `d.MaxGS(b)`                   | `val(a)`                    | The highest-numbered generation in which the DataNode `d` has participated for block `b`.                                                                 |
+| `d.VotedGS(b,c)`               | `vrnd(a)`                   | The highest-numbered generation in which the DataNode `d` has cast a vote for block `b` chunk `c`.                                                        |
+| `d.VotedData(b,c)`             | `vval(a)`                   | The chunk data that the DataNode `d` voted to accept in `d.VotedGS(b,c)`.                                                                                 |
+| `n.GS(b)`                      | `crnd(c)`                   | The highest-numbered generation that the NameNode has initiated for block `b`.                                                                            |
+| `n.Data(b,c)`                  | `cval(c)`                   | The chunk data that the NameNode has picked for block `b` chunk `c` in generation `n.GS(b,c)`.                                                            |
+| `NextGS(b,gs)`                 | Phase 1a message            | A prepare message sent by the NameNode to DataNodes, requesting their participation in generation `gs` for block `b`.                                     |
+| `LastVote(d,b,gs,c,vgs,vdata)` | Phase 1b message            | A response from DataNode `d` to the proposer, containing their last vote generation `vgs` and data `vdata` of last chunk `c`.                             |
+| `Write(b,gs,c,data)`           | Phase 2a message            | A message sent by the client or the NameNode to DataNodes, requesting them to vote on the proposed data.                                                  |
+| `Vote(d,b,gs,c)`               | Phase 2b message            | A message from a DataNode `d` announcing its vote for the proposed value in the given generation `gs`.                                                    |
 
 ### Terminology Used in Proofs
 
