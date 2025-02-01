@@ -1,3 +1,4 @@
+#include <quill/LogMacros.h>
 #include <quill/Logger.h>
 
 namespace rocketfs {
@@ -15,3 +16,5 @@ extern quill::Logger* logger;
 
 #define CHECK_NOTNULL(ptr) CHECK((ptr) != nullptr)
 #define CHECK_LT(lhs, rhs) CHECK((lhs) < (rhs))
+#define CHECK_GT(lhs, rhs) CHECK((lhs) > (rhs))
+#define CHECK_GE(lhs, rhs) CHECK((lhs) >= (rhs))

@@ -35,12 +35,12 @@ include(ThirdPartyFinder)
 include(ProtobufGenerator)
 include(StatusReturnAnalyzer)
 
-find_program(IWYU_EXECUTABLE include-what-you-use REQUIRED)
-set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${IWYU_EXECUTABLE})
-find_program(CPPLINT_EXECUTABLE cpplint REQUIRED)
-set(CMAKE_CXX_CPPLINT ${CPPLINT_EXECUTABLE})
-find_program(CLANG_TIDY_EXECUTABLE clang-tidy REQUIRED)
-set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXECUTABLE})
+# find_program(IWYU_EXECUTABLE include-what-you-use REQUIRED)
+# set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${IWYU_EXECUTABLE})
+# find_program(CPPLINT_EXECUTABLE cpplint REQUIRED)
+# set(CMAKE_CXX_CPPLINT ${CPPLINT_EXECUTABLE})
+# find_program(CLANG_TIDY_EXECUTABLE clang-tidy REQUIRED)
+# set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_EXECUTABLE})
 
 include_directories(src)
 

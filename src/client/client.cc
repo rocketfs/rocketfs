@@ -18,7 +18,7 @@
 #include <unifex/when_all.hpp>
 #include <unifex/with_query_value.hpp>
 
-unifex::task<void> make_unary_request(
+unifex::task<void> make_ping_pong_request(
     agrpc::GrpcContext& grpc_context,
     rocketfs::ClientNamenodeService::Stub& stub) {
   using RPC = agrpc::ClientRPC<
@@ -35,6 +35,21 @@ unifex::task<void> make_unary_request(
 
   //   abort_if_not(status.ok());
   std::cout << "Server streaming: " << response.pong() << '\n';
+}
+
+unifex::task<void> make_mkdirs_request(
+    agrpc::GrpcContext& grpc_contxt,
+    rocketfs::ClientNamenodeService::Stub& stub) {
+  using RPC = agrpc::ClientRPC<
+      &rocketfs::ClientNamenodeService::Stub::PrepareAsyncMkdirs>;
+  grpc::ClientContext client_context;
+  client_context.set_deadline(std::chrono::system_clock::now() +
+                              std::chrono::seconds(5));
+  rocketfs::MkdirsRequest request;
+  rocketfs::MkdirsResponse response;
+  const auto status = co_await RPC::request(
+      grpc_contxt, stub, client_context, request, response);
+  //   abort_if_not(status.ok());
 }
 
 using ServerStreamingClientRPC = agrpc::ClientRPC<
@@ -78,10 +93,10 @@ int main(int argc, const char** argv) {
   rocketfs::ClientNamenodeService::Stub stub{channel};
   agrpc::GrpcContext grpc_context;
 
-  auto sender = unifex::with_query_value(
-      unifex::when_all(make_unary_request(grpc_context, stub)),
-      unifex::get_scheduler,
-      unifex::inline_scheduler{});
-  ;
-  run_grpc_context_for_sender(grpc_context, std::move(sender));
+  run_grpc_context_for_sender(
+      grpc_context,
+      unifex::with_query_value(
+          unifex::when_all(make_mkdirs_request(grpc_context, stub)),
+          unifex::get_scheduler,
+          unifex::inline_scheduler{}));
 }

@@ -7,6 +7,7 @@
 #include <quill/LogMacros.h>
 #include <quill/Logger.h>
 #include <quill/sinks/ConsoleSink.h>
+#include <rocksdb/db.h>
 #include <src/proto/client_namenode.grpc.pb.h>
 
 #include <agrpc/asio_grpc.hpp>
@@ -55,6 +56,11 @@ auto register_mkdirs_request_handler(
       *grpc_context,
       *service,
       [&](MkdirsRPC& rpc, const MkdirsRPC::Request& request) {
+        rocksdb::DB* db = nullptr;
+        rocksdb::Options options;
+        options.create_if_missing = true;
+        CHECK(rocksdb::DB::Open(options, "/tmp/rocksdb", &db).ok());
+        db->Put(rocksdb::WriteOptions(), "key", "value");
         return unifex::let_value_with([] { return MkdirsRPC::Response{}; },
                                       [&](auto& response) {
                                         return rpc.finish(response,
@@ -96,7 +102,9 @@ int main(int argc, const char** argv) {
       &grpc_context,
       unifex::with_query_value(
           unifex::when_all(rocketfs::register_ping_pong_request_handler(
-              &grpc_context, &service)),
+                               &grpc_context, &service),
+                           rocketfs::register_mkdirs_request_handler(
+                               &grpc_context, &service)),
           unifex::get_scheduler,
           unifex::inline_scheduler{}));
 }
