@@ -1,3 +1,5 @@
+#include <fmt/core.h>
+
 #include <string>
 #include <string_view>
 
@@ -7,7 +9,7 @@ enum class StatusCode {
   kOK = 0,
 
   // Error encountered in `KVStoreBase`.
-  kKVStoreKeyNotFoundError = 1001,
+  kNotFoundError = 1001,
 };
 
 class Status {
@@ -21,19 +23,48 @@ class Status {
   Status& operator=(Status&&) = default;
   ~Status() = default;
 
-  bool IsOK() const;
-  bool IsKVStoreKeyNotFoundError() const;
+  inline bool IsOK() const;
+  inline bool IsNotFoundError() const;
 
-  std::string_view GetMsg() const;
+  inline std::string_view GetMsg() const;
 
  public:
-  static Status OK(std::string_view msg = "");
-  static Status KVStoreKeyNotFoundError(
+  inline static Status OK(std::string_view msg = "");
+  inline static Status NotFoundError(
       const Status& internal_error = Status::OK(), std::string_view msg = "");
 
  private:
   StatusCode status_code_;
   std::string msg_;
 };
+
+Status::Status(StatusCode status_code, std::string_view msg)
+    : status_code_(status_code), msg_(msg) {
+}
+
+bool Status::IsOK() const {
+  return status_code_ == StatusCode::kOK;
+}
+
+bool Status::IsNotFoundError() const {
+  return status_code_ == StatusCode::kNotFoundError;
+}
+
+Status Status::OK(std::string_view msg) {
+  return Status(StatusCode::kOK, msg);
+}
+
+Status Status::NotFoundError(const Status& internal_error,
+                             std::string_view msg) {
+  return Status(
+      StatusCode::kNotFoundError,
+      fmt::format("not found error with internal error: [{}] and msg: {}",
+                  internal_error.GetMsg(),
+                  msg));
+}
+
+std::string_view Status::GetMsg() const {
+  return msg_;
+}
 
 }  // namespace rocketfs

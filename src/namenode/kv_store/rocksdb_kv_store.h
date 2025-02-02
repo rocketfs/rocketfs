@@ -21,9 +21,28 @@ class RocksDBWriteBatch : public WriteBatchBase {
            std::string_view value) override;
   void Delete(ColumnFamilyIndex cf_index, std::string_view key) override;
 
+  rocksdb::WriteBatch* GetWriteBatch();
+
  private:
   const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles_;
   rocksdb::WriteBatch write_batch_;
+};
+
+class RocksDBSnapshot : public SnapshotBase {
+ public:
+  explicit RocksDBSnapshot(rocksdb::DB* db);
+  RocksDBSnapshot(const RocksDBSnapshot&) = delete;
+  RocksDBSnapshot(RocksDBSnapshot&&) = delete;
+  RocksDBSnapshot& operator=(const RocksDBSnapshot&) = delete;
+  RocksDBSnapshot& operator=(RocksDBSnapshot&&) = delete;
+  ~RocksDBSnapshot() = default;
+
+  const rocksdb::Snapshot* GetSnapshot();
+
+ private:
+  std::unique_ptr<const rocksdb::Snapshot,
+                  std::function<void(const rocksdb::Snapshot*)>>
+      snapshot_;
 };
 
 class RocksDBKVStore : public KVStoreBase {
@@ -35,11 +54,16 @@ class RocksDBKVStore : public KVStoreBase {
   RocksDBKVStore& operator=(RocksDBKVStore&&) = delete;
   ~RocksDBKVStore() override = default;
 
+  std::unique_ptr<SnapshotBase> GetSnapshot() override;
   Status Read(SnapshotBase* snapshot,
               ColumnFamilyIndex cf_index,
               std::string_view key,
               std::string* value) override;
   Status Write(WriteBatchBase* write_batch) override;
+
+ private:
+  std::unique_ptr<rocksdb::DB> db_;
+  std::vector<rocksdb::ColumnFamilyHandle*> cf_handles_;
 };
 
 }  // namespace rocketfs

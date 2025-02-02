@@ -49,8 +49,9 @@ add_executable(namenode ${NAMENODE_SRCS})
 target_link_libraries(
   namenode
   PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex
-          unifex::unifex quill::quill RocksDB::rocksdb
-  PRIVATE -fsanitize=address,undefined)
+          unifex::unifex quill::quill RocksDB::rocksdb gflags::gflags_static fmt::fmt-header-only
+  # PRIVATE -fsanitize=address,undefined)
+)
 target_compile_definitions(
   namenode
   PRIVATE UNIFEX_NO_ASYNC_STACKS
@@ -62,7 +63,8 @@ target_link_libraries(
   client
   PRIVATE gRPC::grpc++ gRPC::grpc++_unsecure protos asio-grpc::asio-grpc-unifex
           unifex::unifex
-  PRIVATE -fsanitize=address,undefined)
+  # PRIVATE -fsanitize=address,undefined)
+)
 target_compile_definitions(
   client
   PRIVATE UNIFEX_NO_ASYNC_STACKS

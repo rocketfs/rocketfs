@@ -8,7 +8,7 @@
         "xaver.clang-format",
         "esbenp.prettier-vscode",
         "GitHub.vscode-github-actions",
-        "MarsCode.marscode-extension"
+        "saoudrizwan.claude-dev"
       ]
     }
   }

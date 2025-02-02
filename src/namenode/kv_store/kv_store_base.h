@@ -2,26 +2,9 @@
 #include <string_view>
 
 #include "common/status.h"
+#include "namenode/kv_store/column_family.h"
 
 namespace rocketfs {
-
-class ColumnFamilyIndex {
- public:
-  ColumnFamilyIndex();
-  explicit ColumnFamilyIndex(int32_t index);
-  ColumnFamilyIndex(const ColumnFamilyIndex&) = default;
-  ColumnFamilyIndex(ColumnFamilyIndex&&) = default;
-  ColumnFamilyIndex& operator=(const ColumnFamilyIndex&) = default;
-  ColumnFamilyIndex& operator=(ColumnFamilyIndex&&) = default;
-  ~ColumnFamilyIndex() = default;
-
-  int32_t GetIndex() const;
-
- private:
-  int32_t index_;
-};
-
-extern const ColumnFamilyIndex kInvalidCFIndex;
 
 class WriteBatchBase {
  public:
@@ -57,6 +40,7 @@ class KVStoreBase {
   KVStoreBase& operator=(KVStoreBase&&) = delete;
   virtual ~KVStoreBase() = default;
 
+  virtual std::unique_ptr<SnapshotBase> GetSnapshot() = 0;
   virtual Status Read(SnapshotBase* snapshot,
                       ColumnFamilyIndex cf_index,
                       std::string_view key,

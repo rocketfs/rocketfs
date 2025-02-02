@@ -15,6 +15,8 @@ extern quill::Logger* logger;
   } while (0)
 
 #define CHECK_NOTNULL(ptr) CHECK((ptr) != nullptr)
+#define CHECK_NE(lhs, rhs) CHECK((lhs) != (rhs))
+#define CHECK_EQ(lhs, rhs) CHECK((lhs) == (rhs))
 #define CHECK_LT(lhs, rhs) CHECK((lhs) < (rhs))
 #define CHECK_GT(lhs, rhs) CHECK((lhs) > (rhs))
 #define CHECK_GE(lhs, rhs) CHECK((lhs) >= (rhs))
