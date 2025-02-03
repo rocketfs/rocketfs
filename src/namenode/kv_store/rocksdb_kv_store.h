@@ -58,8 +58,9 @@ class RocksDBKVStore : public KVStoreBase {
   Status Read(SnapshotBase* snapshot,
               ColumnFamilyIndex cf_index,
               std::string_view key,
-              std::string* value) override;
-  Status Write(WriteBatchBase* write_batch) override;
+              std::pmr::string* value) override;
+  std::unique_ptr<WriteBatchBase> CreateWriteBatch() override;
+  Status Write(std::unique_ptr<WriteBatchBase> write_batch) override;
 
  private:
   std::unique_ptr<rocksdb::DB> db_;

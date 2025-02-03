@@ -2,6 +2,8 @@
 
 #include <gflags/gflags.h>
 
+#include <memory_resource>
+
 #include "common/logger.h"
 #include "namenode/kv_store/column_family.h"
 
@@ -68,7 +70,7 @@ std::unique_ptr<SnapshotBase> RocksDBKVStore::GetSnapshot() {
 Status RocksDBKVStore::Read(SnapshotBase* snapshot,
                             ColumnFamilyIndex cf_index,
                             std::string_view key,
-                            std::string* value) {
+                            std::pmr::string* value) {
   CHECK_NOTNULL(value);
   rocksdb::ReadOptions read_options;
   if (snapshot != nullptr) {
@@ -79,18 +81,25 @@ Status RocksDBKVStore::Read(SnapshotBase* snapshot,
   CHECK_NE(cf_index, kInvalidCFIndex);
   CHECK_GE(cf_index.index, 0);
   CHECK_LT(cf_index.index, cf_handles_.size());
+  rocksdb::PinnableSlice pinnable_slice;
   rocksdb::Status status =
-      db_->Get(read_options, cf_handles_[cf_index.index], key, value);
+      db_->Get(read_options, cf_handles_[cf_index.index], key, &pinnable_slice);
   CHECK(status.ok() || status.IsNotFound());
   if (!status.ok()) {
-    value->clear();
+    return Status::NotFoundError();
   }
-  return status.IsNotFound() ? Status::NotFoundError() : Status::OK();
+  value->assign(pinnable_slice.data(), pinnable_slice.size());
+  return Status::OK();
 }
 
-Status RocksDBKVStore::Write(WriteBatchBase* write_batch) {
+std::unique_ptr<WriteBatchBase> RocksDBKVStore::CreateWriteBatch() {
+  return std::make_unique<RocksDBWriteBatch>(cf_handles_);
+}
+
+Status RocksDBKVStore::Write(std::unique_ptr<WriteBatchBase> write_batch) {
   CHECK_NOTNULL(write_batch);
-  auto rocksdb_write_batch = dynamic_cast<RocksDBWriteBatch*>(write_batch);
+  auto rocksdb_write_batch =
+      dynamic_cast<RocksDBWriteBatch*>(write_batch.get());
   CHECK_NOTNULL(rocksdb_write_batch);
   rocksdb::WriteOptions write_options;
   rocksdb::Status status =

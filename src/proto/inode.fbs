@@ -11,9 +11,3 @@ table INodeTimestampsAndTxIDs {
   created_txid:long;
   renamed_txid:long;
 }
-
-table INodeAttr {
-}
-
-table INodeXAttr {
-}

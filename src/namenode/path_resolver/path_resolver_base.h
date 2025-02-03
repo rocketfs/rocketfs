@@ -1,0 +1,36 @@
+#pragma once
+
+#include <memory>
+#include <memory_resource>
+#include <shared_mutex>
+#include <span>
+#include <string>
+#include <vector>
+
+#include "common/status.h"
+#include "generated/inode_generated.h"
+#include "namenode/transaction_manager/table/inode_table_base.h"
+
+namespace rocketfs {
+
+struct PathComponent {
+  std::pmr::string name;
+  std::shared_ptr<INodeT> inode;
+  std::shared_mutex lock;
+};
+
+class PathResolverBase {
+ public:
+  PathResolverBase() = default;
+  PathResolverBase(const PathResolverBase&) = delete;
+  PathResolverBase(PathResolverBase&&) = delete;
+  PathResolverBase& operator=(const PathResolverBase&) = delete;
+  PathResolverBase& operator=(PathResolverBase&&) = delete;
+  virtual ~PathResolverBase() = default;
+
+  virtual Status Resolve(
+      std::span<std::pmr::string> paths,
+      std::pmr::vector<std::pmr::vector<PathComponent>>* resolved_paths) = 0;
+};
+
+}  // namespace rocketfs

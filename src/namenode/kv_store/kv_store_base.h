@@ -1,4 +1,7 @@
+#pragma once
+
 #include <cstdint>
+#include <memory>
 #include <string_view>
 
 #include "common/status.h"
@@ -44,8 +47,9 @@ class KVStoreBase {
   virtual Status Read(SnapshotBase* snapshot,
                       ColumnFamilyIndex cf_index,
                       std::string_view key,
-                      std::string* value) = 0;
-  virtual Status Write(WriteBatchBase* write_batch) = 0;
+                      std::pmr::string* value) = 0;
+  virtual std::unique_ptr<WriteBatchBase> CreateWriteBatch() = 0;
+  virtual Status Write(std::unique_ptr<WriteBatchBase> write_batch) = 0;
 };
 
 }  // namespace rocketfs

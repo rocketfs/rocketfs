@@ -1,3 +1,5 @@
+#pragma once
+
 #include <fmt/core.h>
 
 #include <string>
@@ -14,7 +16,7 @@ enum class StatusCode {
 
 class Status {
  private:
-  Status(StatusCode status_code, std::string_view msg);
+  inline Status(StatusCode status_code, std::string_view msg);
 
  public:
   Status(const Status&) = default;
