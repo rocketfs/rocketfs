@@ -27,8 +27,7 @@ constexpr INodeID kRootINodeID{0};
 
 class INode {
  public:
-  INode(std::pmr::string basic_info_str,
-        std::pmr::string timestamps_and_txids_str);
+  INode(std::pmr::string basic_info_str, std::pmr::string timestamps_str);
   INode(const INode&) = delete;
   INode(INode&&) = default;
   INode& operator=(const INode&) = delete;
@@ -39,17 +38,20 @@ class INode {
   int64_t parent_inode_id() const;
   std::string_view name() const;
   int64_t inode_id() const;
+  int64_t created_txid() const;
+  int64_t renamed_txid() const;
   int64_t ctime_in_nanoseconds() const;
   int64_t mtime_in_nanoseconds() const;
   int64_t atime_in_nanoseconds() const;
-  int64_t created_txid() const;
-  int64_t renamed_txid() const;
 
  private:
   std::pmr::string basic_info_str_;
   const INodeBasicInfo* basic_info_;
-  std::pmr::string timestamps_and_txids_str_;
-  const INodeTimestampsAndTxIDs* timestamps_and_txids_;
+  std::pmr::string timestamps_str_;
+  const INodeTimestamps* timestamps_;
+
+ private:
+  friend class INodeT;
 };
 
 class INodeT {
@@ -65,15 +67,15 @@ class INodeT {
   int64_t& parent_inode_id();
   std::string& name();
   int64_t& inode_id();
+  int64_t& created_txid();
+  int64_t& renamed_txid();
   int64_t& ctime_in_nanoseconds();
   int64_t& mtime_in_nanoseconds();
   int64_t& atime_in_nanoseconds();
-  int64_t& created_txid();
-  int64_t& renamed_txid();
 
  private:
   INodeBasicInfoT basic_info_;
-  INodeTimestampsAndTxIDsT timestamps_and_txids_;
+  INodeTimestampsT timestamps_;
 };
 
 class INodeTableBase {
@@ -89,6 +91,9 @@ class INodeTableBase {
                       INodeID parent_inode_id,
                       std::string_view name,
                       INode* inode) = 0;
+  virtual void Write(const INode& original,
+                     const INodeT& modified,
+                     WriteBatchBase* write_batch) = 0;
 };
 
 }  // namespace rocketfs

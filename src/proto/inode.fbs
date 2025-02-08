@@ -2,12 +2,12 @@ table INodeBasicInfo {
   parent_inode_id:long;
   name:string;
   inode_id:long;
+  created_txid:long;
+  renamed_txid:long;
 }
 
-table INodeTimestampsAndTxIDs {
+table INodeTimestamps {
   ctime_in_nanoseconds:long;
   mtime_in_nanoseconds:long;
   atime_in_nanoseconds:long;
-  created_txid:long;
-  renamed_txid:long;
 }

@@ -5,6 +5,7 @@
 #include <shared_mutex>
 #include <span>
 #include <string>
+#include <unifex/async_mutex.hpp>
 #include <vector>
 
 #include "common/status.h"
@@ -16,7 +17,7 @@ namespace rocketfs {
 struct PathComponent {
   std::pmr::string name;
   std::shared_ptr<INodeT> inode;
-  std::shared_mutex lock;
+  unifex::async_mutex lock;
 };
 
 class PathResolverBase {

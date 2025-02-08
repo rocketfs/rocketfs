@@ -23,6 +23,7 @@
 
 #include "common/logger.h"
 #include "namenode/namenode_context.h"
+#include "namenode/service/handler_context.h"
 
 namespace rocketfs {
 
@@ -55,13 +56,17 @@ auto register_mkdirs_request_handler(
   CHECK_NOTNULL(grpc_context);
   CHECK_NOTNULL(service);
   CHECK_NOTNULL(namenode_context);
+  auto handler_context = std::make_unique<HandlerContext>(namenode_context);
   return agrpc::register_sender_rpc_handler<MkdirsRPC>(
       *grpc_context,
       *service,
       [&](MkdirsRPC& rpc, const MkdirsRPC::Request& request) {
-        auto write_batch = namenode_context->GetKVStore()->CreateWriteBatch();
-        write_batch->Put(kINodeCFIndex, "key", "value");
-        namenode_context->GetKVStore()->Write(std::move(write_batch));
+        auto write_batch =
+            handler_context->GetNameNodeContext()
+                ->GetKVStore()
+                ->CreateWriteBatch(handler_context->GetMemoryResource());
+        handler_context->GetNameNodeContext()->GetKVStore()->Write(
+            std::move(write_batch));
         return unifex::let_value_with([] { return MkdirsRPC::Response{}; },
                                       [&](auto& response) {
                                         return rpc.finish(response,

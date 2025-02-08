@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
 
 namespace rocketfs {
 
@@ -19,6 +20,10 @@ inline bool operator!=(const ColumnFamilyIndex& lhs,
 }
 
 constexpr ColumnFamilyIndex kInvalidCFIndex{-1};
-constexpr ColumnFamilyIndex kINodeCFIndex{0};
+constexpr ColumnFamilyIndex kINodeBasicInfoCFIndex{0};
+constexpr ColumnFamilyIndex kINodeTimestampsCFIndex{1};
+
+constexpr std::string_view kINodeBasicInfoCFName{"INodeBasicInfo"};
+constexpr std::string_view kINodeTimestampsCFName{"INodeTimestamps"};
 
 }  // namespace rocketfs
