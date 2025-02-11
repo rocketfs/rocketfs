@@ -20,7 +20,7 @@ bool SharedMutex::Unref() {
 }
 
 void SharedMutex::Lock() {
-  mutex_.lock();
+  mutex_.async_lock();
 }
 
 void SharedMutex::Unlock() {
@@ -28,14 +28,11 @@ void SharedMutex::Unlock() {
 }
 
 void SharedMutex::LockShared() {
-  mutex_.lock_shared();
+  mutex_.async_lock_shared();
 }
 
 void SharedMutex::UnlockShared() {
   mutex_.unlock_shared();
 }
-
-
-
 
 }  // namespace rocketfs

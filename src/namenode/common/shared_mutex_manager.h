@@ -5,6 +5,8 @@
 #include <unifex/async_shared_mutex.hpp>
 #include <unordered_map>
 
+#include "common/logger.h"
+
 namespace rocketfs {
 
 class SharedMutex {
@@ -35,10 +37,14 @@ enum class LockType : int8_t {
 };
 
 template <typename T, typename K>
+  requires std::equality_comparable<T> && std::constructible_from<T, K>
+class SharedMutexBucket;
+
+template <typename T, typename K>
 class LockGuard {
  public:
   LockGuard(K key,
-            SharedMutexBucket<T>* bucket,
+            SharedMutexBucket<T, K>* bucket,
             SharedMutex* mutex,
             LockType lock_type);
   LockGuard(const LockGuard&) = delete;
@@ -49,14 +55,13 @@ class LockGuard {
 
  private:
   K key_;
-  SharedMutexBucket<T>* bucket_;
+  SharedMutexBucket<T, K>* bucket_;
   SharedMutex* mutex_;
   LockType lock_type_;
 };
 
 template <typename T, typename K>
-  requires std::hashable<T> && std::equality_comparable<T> &&
-           std::constructible_from<T, K>
+  requires std::equality_comparable<T> && std::constructible_from<T, K>
 class SharedMutexBucket {
  public:
   SharedMutexBucket() = default;
@@ -66,7 +71,7 @@ class SharedMutexBucket {
   SharedMutexBucket& operator=(SharedMutexBucket&&) = default;
   ~SharedMutexBucket() = default;
 
-  LockGuard<T> Lock(K key, LockType lock_type);
+  LockGuard<T, K> Lock(K key, LockType lock_type);
 
   SharedMutex* GetOrCreate(K key);
   void Release(K key, SharedMutex* mutex);
@@ -76,8 +81,7 @@ class SharedMutexBucket {
 };
 
 template <typename T, typename K>
-  requires std::hashable<T> && std::equality_comparable<T> &&
-           std::constructible_from<T, K>
+  requires std::equality_comparable<T> && std::constructible_from<T, K>
 class SharedMutexManager {
  public:
   explicit SharedMutexManager(int bucket_size);
@@ -90,12 +94,12 @@ class SharedMutexManager {
   std::shared_ptr<LockGuard<T, K>> AcquireLock(K key, LockType lock_type);
 
  private:
-  std::vector<SharedMutexBucket<T>> buckets_;
+  std::vector<SharedMutexBucket<T, K>> buckets_;
 };
 
 template <typename T, typename K>
 LockGuard<T, K>::LockGuard(K key,
-                           SharedMutexBucket<T>* bucket,
+                           SharedMutexBucket<T, K>* bucket,
                            SharedMutex* mutex,
                            LockType lock_type)
     : bucket_(bucket), mutex_(mutex), lock_type_(lock_type) {
