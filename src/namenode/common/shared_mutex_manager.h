@@ -3,6 +3,9 @@
 #include <cstdint>
 #include <memory>
 #include <unifex/async_shared_mutex.hpp>
+#include <unifex/just.hpp>
+#include <unifex/just_from.hpp>
+#include <unifex/task.hpp>
 #include <unordered_map>
 
 #include "common/logger.h"
@@ -21,10 +24,7 @@ class SharedMutex {
   void Ref();
   bool Unref();
 
-  void Lock();
-  void Unlock();
-  void LockShared();
-  void UnlockShared();
+  unifex::async_shared_mutex* operator->();
 
  private:
   int ref_count_;
@@ -48,9 +48,9 @@ class LockGuard {
             SharedMutex* mutex,
             LockType lock_type);
   LockGuard(const LockGuard&) = delete;
-  LockGuard(LockGuard&&) = delete;
+  LockGuard(LockGuard&&) = default;
   LockGuard& operator=(const LockGuard&) = delete;
-  LockGuard& operator=(LockGuard&&) = delete;
+  LockGuard& operator=(LockGuard&&) = default;
   ~LockGuard();
 
  private:
@@ -71,13 +71,14 @@ class SharedMutexBucket {
   SharedMutexBucket& operator=(SharedMutexBucket&&) = default;
   ~SharedMutexBucket() = default;
 
-  LockGuard<T, K> Lock(K key, LockType lock_type);
+  unifex::task<LockGuard<T, K>> Lock(K key, LockType lock_type);
 
-  SharedMutex* GetOrCreate(K key);
-  void Release(K key, SharedMutex* mutex);
+  unifex::task<SharedMutex*> GetOrCreate(K key);
+  unifex::task<void> Release(K key, SharedMutex* mutex);
 
  private:
-  std::unordered_map<K, unifex::async_mutex> mutexes_;
+  unifex::async_mutex mutex_;
+  std::unordered_map<K, SharedMutex> mutexes_;
 };
 
 template <typename T, typename K>
@@ -91,7 +92,7 @@ class SharedMutexManager {
   SharedMutexManager& operator=(SharedMutexManager&&) = delete;
   ~SharedMutexManager() = default;
 
-  std::shared_ptr<LockGuard<T, K>> AcquireLock(K key, LockType lock_type);
+  unifex::task<LockGuard<T, K>> AcquireLock(K key, LockType lock_type);
 
  private:
   std::vector<SharedMutexBucket<T, K>> buckets_;
@@ -106,14 +107,6 @@ LockGuard<T, K>::LockGuard(K key,
   CHECK_NOTNULL(bucket_);
   CHECK_NOTNULL(mutex_);
   CHECK(lock_type_ == LockType::kRead || lock_type_ == LockType::kWrite);
-  switch (lock_type_) {
-    case LockType::kRead: {
-      mutex_->LockShared();
-    } break;
-    case LockType::kWrite: {
-      mutex_->Lock();
-    } break;
-  }
 }
 
 template <typename T, typename K>
@@ -121,13 +114,68 @@ LockGuard<T, K>::~LockGuard() {
   CHECK(lock_type_ == LockType::kRead || lock_type_ == LockType::kWrite);
   switch (lock_type_) {
     case LockType::kRead: {
-      mutex_->UnlockShared();
+      (*mutex_)->unlock_shared();
     } break;
     case LockType::kWrite: {
-      mutex_->Unlock();
+      (*mutex_)->unlock();
     } break;
   }
-  bucket_->Release(key_, mutex_);
+  unifex::sync_wait(bucket_->Release(key_, mutex_));
+}
+
+template <typename T, typename K>
+  requires std::equality_comparable<T> && std::constructible_from<T, K>
+unifex::task<LockGuard<T, K>> SharedMutexBucket<T, K>::Lock(
+    K key, LockType lock_type) {
+  auto* mutex = co_await GetOrCreate(key);
+  CHECK(lock_type == LockType::kRead || lock_type == LockType::kWrite);
+  switch (lock_type) {
+    case LockType::kRead: {
+      co_await (*mutex)->async_lock_shared();
+    } break;
+    case LockType::kWrite: {
+      co_await (*mutex)->async_lock();
+    } break;
+  }
+  co_return LockGuard<T, K>(key, this, mutex, lock_type);
+}
+
+template <typename T, typename K>
+  requires std::equality_comparable<T> && std::constructible_from<T, K>
+unifex::task<SharedMutex*> SharedMutexBucket<T, K>::GetOrCreate(K key) {
+  SharedMutex* mutex = nullptr;
+  co_await mutex_.async_lock();
+  mutex = &mutexes_[key];
+  mutex->Ref();
+  mutex_.unlock();
+  co_return mutex;
+}
+
+template <typename T, typename K>
+  requires std::equality_comparable<T> && std::constructible_from<T, K>
+unifex::task<void> SharedMutexBucket<T, K>::Release(K key, SharedMutex* mutex) {
+  co_await mutex_.async_lock();
+  auto it = mutexes_.find(key);
+  CHECK_NE(it, mutexes_.end());
+  CHECK_EQ(&it->second, mutex);
+  if (mutex->Unref()) {
+    mutexes_.erase(it);
+  }
+  mutex_.unlock();
+}
+
+template <typename T, typename K>
+  requires std::equality_comparable<T> && std::constructible_from<T, K>
+SharedMutexManager<T, K>::SharedMutexManager(int bucket_size)
+    : buckets_(bucket_size) {
+}
+
+template <typename T, typename K>
+  requires std::equality_comparable<T> && std::constructible_from<T, K>
+unifex::task<LockGuard<T, K>> SharedMutexManager<T, K>::AcquireLock(
+    K key, LockType lock_type) {
+  co_return co_await buckets_[std::hash<K>{}(key) % buckets_.size()].Lock(
+      key, lock_type);
 }
 
 }  // namespace rocketfs

@@ -19,20 +19,8 @@ bool SharedMutex::Unref() {
   return ref_count_ == 0;
 }
 
-void SharedMutex::Lock() {
-  mutex_.async_lock();
-}
-
-void SharedMutex::Unlock() {
-  mutex_.unlock();
-}
-
-void SharedMutex::LockShared() {
-  mutex_.async_lock_shared();
-}
-
-void SharedMutex::UnlockShared() {
-  mutex_.unlock_shared();
+unifex::async_shared_mutex* SharedMutex::operator->() {
+  return &mutex_;
 }
 
 }  // namespace rocketfs

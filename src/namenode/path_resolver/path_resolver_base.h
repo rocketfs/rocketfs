@@ -11,6 +11,7 @@
 
 #include "common/status.h"
 #include "generated/inode_generated.h"
+#include "namenode/common/shared_mutex_manager.h"
 #include "namenode/transaction_manager/table/inode_table.h"
 #include "namenode/transaction_manager/table/inode_table_base.h"
 
@@ -38,7 +39,7 @@ class PathResolverBase {
   virtual ~PathResolverBase() = default;
 
   virtual Status Resolve(
-      std::span<std::pmr::string> paths,
+      std::span<ToBeResolvedPath> to_be_resolved_paths,
       std::pmr::vector<std::pmr::vector<PathComponent>>* resolved_paths) = 0;
 };
 
