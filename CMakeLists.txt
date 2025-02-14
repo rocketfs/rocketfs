@@ -75,8 +75,8 @@ target_link_libraries(
          unifex::unifex)
 target_compile_definitions(
   rocketfs
-  PRIVATE UNIFEX_NO_ASYNC_STACKS
-  PRIVATE UNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF)
+  PUBLIC UNIFEX_NO_ASYNC_STACKS
+  PUBLIC UNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF)
 
 file(GLOB_RECURSE test-srcs ${CMAKE_SOURCE_DIR}/test/*_test.cc)
 add_executable(test ${test-srcs})
