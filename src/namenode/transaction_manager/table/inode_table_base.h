@@ -1,7 +1,10 @@
+// Copyright 2025 RocketFS
+
 #pragma once
 
-#include <memory>
+#include <cstdint>
 #include <memory_resource>
+#include <string>
 #include <string_view>
 
 #include "common/status.h"

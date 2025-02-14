@@ -1,3 +1,5 @@
+// Copyright 2025 RocketFS
+
 #include "namenode/common/shared_mutex_manager.h"
 
 #include "common/logger.h"

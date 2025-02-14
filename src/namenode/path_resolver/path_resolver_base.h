@@ -1,18 +1,15 @@
 #pragma once
 
-#include <cstdint>
 #include <memory>
 #include <memory_resource>
-#include <shared_mutex>
+#include <set>
 #include <span>
 #include <string>
-#include <unifex/async_mutex.hpp>
+#include <string_view>
 #include <vector>
 
 #include "common/status.h"
-#include "generated/inode_generated.h"
 #include "namenode/common/shared_mutex_manager.h"
-#include "namenode/transaction_manager/table/inode_table.h"
 #include "namenode/transaction_manager/table/inode_table_base.h"
 
 namespace rocketfs {
@@ -23,10 +20,38 @@ struct ToBeResolvedPath {
   LockType last_component_lock_type;
 };
 
-struct PathComponent {
-  std::pmr::string name;
-  std::shared_ptr<INodeT> inode;
-  unifex::async_mutex lock;
+class PathComponent {
+ public:
+  using allocator_type = std::pmr::polymorphic_allocator<void>;
+
+  PathComponent(allocator_type allocator);
+  PathComponent(const PathComponent& other) = delete;
+  PathComponent(PathComponent&& other);
+  PathComponent(PathComponent&& other, allocator_type allocator);
+  PathComponent& operator=(const PathComponent& other) = delete;
+  PathComponent& operator=(PathComponent&& other);
+
+ private:
+  allocator_type allocator_;
+  std::pmr::string full_path_;
+  LockGuard<std::string, std::string_view>* lock_guard_;
+  std::pmr::string last_inode_name_;
+  std::shared_ptr<INodeT> last_inode_;
+};
+
+class ResolvedPaths {
+ public:
+  using allocator_type = std::pmr::polymorphic_allocator<void>;
+
+  ResolvedPaths(allocator_type allocator);
+  ResolvedPaths(const ResolvedPaths& other) = delete;
+  ResolvedPaths(ResolvedPaths&& other);
+  ResolvedPaths& operator=(const ResolvedPaths& other) = delete;
+  ResolvedPaths& operator=(ResolvedPaths&& other);
+
+ private:
+  allocator_type allocator_;
+  std::pmr::vector<PathComponent> components_;
 };
 
 class PathResolverBase {
@@ -40,7 +65,7 @@ class PathResolverBase {
 
   virtual Status Resolve(
       std::span<ToBeResolvedPath> to_be_resolved_paths,
-      std::pmr::vector<std::pmr::vector<PathComponent>>* resolved_paths) = 0;
+      std::vector<std::vector<PathComponent>>* resolved_paths) = 0;
 };
 
 }  // namespace rocketfs

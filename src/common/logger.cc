@@ -1,8 +1,12 @@
+// Copyright 2025 RocketFS
+
 #include "common/logger.h"
 
 #include <quill/Frontend.h>
 #include <quill/Logger.h>
 #include <quill/sinks/ConsoleSink.h>
+
+#include <string>
 
 namespace rocketfs {
 

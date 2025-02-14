@@ -1,12 +1,15 @@
 #pragma once
 
+#include <concepts>
 #include <cstdint>
-#include <memory>
+#include <functional>
+#include <optional>
+#include <unifex/async_mutex.hpp>
 #include <unifex/async_shared_mutex.hpp>
-#include <unifex/just.hpp>
-#include <unifex/just_from.hpp>
+#include <unifex/sync_wait.hpp>
 #include <unifex/task.hpp>
 #include <unordered_map>
+#include <vector>
 
 #include "common/logger.h"
 
@@ -43,6 +46,7 @@ class SharedMutexBucket;
 template <typename T, typename K>
 class LockGuard {
  public:
+  LockGuard() = default;
   LockGuard(K key,
             SharedMutexBucket<T, K>* bucket,
             SharedMutex* mutex,
@@ -57,7 +61,7 @@ class LockGuard {
   K key_;
   SharedMutexBucket<T, K>* bucket_;
   SharedMutex* mutex_;
-  LockType lock_type_;
+  std::optional<LockType> lock_type_;
 };
 
 template <typename T, typename K>
@@ -111,8 +115,14 @@ LockGuard<T, K>::LockGuard(K key,
 
 template <typename T, typename K>
 LockGuard<T, K>::~LockGuard() {
-  CHECK(lock_type_ == LockType::kRead || lock_type_ == LockType::kWrite);
-  switch (lock_type_) {
+  if (lock_type_ == std::nullopt) {
+    CHECK_NULL(bucket_);
+    CHECK_NULL(mutex_);
+    return;
+  }
+
+  CHECK(*lock_type_ == LockType::kRead || *lock_type_ == LockType::kWrite);
+  switch (*lock_type_) {
     case LockType::kRead: {
       (*mutex_)->unlock_shared();
     } break;

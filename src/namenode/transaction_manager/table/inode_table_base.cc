@@ -1,4 +1,13 @@
+// Copyright 2025 RocketFS
+
 #include "namenode/transaction_manager/table/inode_table_base.h"
+
+#include <flatbuffers/buffer.h>
+#include <flatbuffers/string.h>
+#include <flatbuffers/verifier.h>
+
+#include <span>
+#include <utility>
 
 #include "common/logger.h"
 

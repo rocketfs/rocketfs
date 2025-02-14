@@ -1,7 +1,17 @@
 #include <rocksdb/db.h>
+#include <rocksdb/snapshot.h>
+#include <rocksdb/write_batch.h>
 
+#include <functional>
+#include <memory>
 #include <memory_resource>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <variant>
 #include <vector>
+#include <version>
 
 #include "namenode/kv_store/kv_store_base.h"
 

@@ -2,9 +2,13 @@
 
 #include "namenode/transaction_manager/table/inode_table.h"
 
-#include "absl/base/internal/endian.h"
+#include <absl/base/internal/endian.h>
+
+#include <utility>
+
 #include "common/logger.h"
-#include "generated/inode_generated.h"
+#include "common/status.h"
+#include "namenode/kv_store/column_family.h"
 
 namespace rocketfs {
 

@@ -1,10 +1,22 @@
+// Copyright 2025 RocketFS
+
 #include "namenode/kv_store/rocksdb_kv_store.h"
 
 #include <gflags/gflags.h>
+#include <rocksdb/options.h>
+#include <rocksdb/slice.h>
+#include <rocksdb/status.h>
 
+#include <initializer_list>
+#include <iterator>
+#include <memory>
 #include <memory_resource>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "common/logger.h"
+#include "common/status.h"
 #include "namenode/kv_store/column_family.h"
 
 namespace rocketfs {

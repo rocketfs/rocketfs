@@ -1,3 +1,5 @@
+// Copyright 2025 RocketFS
+
 #include "namenode/namenode_context.h"
 
 #include "namenode/kv_store/rocksdb_kv_store.h"

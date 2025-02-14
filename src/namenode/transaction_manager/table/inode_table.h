@@ -1,7 +1,12 @@
+// Copyright 2025 RocketFS
+
 #pragma once
 
 #include <memory_resource>
+#include <string>
+#include <string_view>
 
+#include "namenode/kv_store/kv_store_base.h"
 #include "namenode/transaction_manager/table/inode_table_base.h"
 
 namespace rocketfs {

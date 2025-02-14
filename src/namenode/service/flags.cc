@@ -1,3 +1,5 @@
+// Copyright 2025 RocketFS
+
 #include <gflags/gflags.h>
 
 namespace rocketfs {

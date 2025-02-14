@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <memory_resource>
 
 #include "namenode/kv_store/kv_store_base.h"

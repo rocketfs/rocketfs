@@ -1,7 +1,9 @@
 #pragma once
 
-#include <memory_resource>
+#include <string>
+#include <string_view>
 
+#include "namenode/common/shared_mutex_manager.h"
 #include "namenode/path_resolver/path_resolver_base.h"
 
 namespace rocketfs {
@@ -15,12 +17,12 @@ class PathResolver : public PathResolverBase {
   PathResolver& operator=(PathResolver&&) = delete;
   ~PathResolver() override = default;
 
-  Status Resolve(std::span<ToBeResolvedPath> to_be_resolved_paths,
-                 std::pmr::vector<std::pmr::vector<PathComponent>>*
-                     resolved_paths) override;
+  Status Resolve(
+      std::span<ToBeResolvedPath> to_be_resolved_paths,
+      std::vector<std::vector<PathComponent>>* resolved_paths) override;
 
  private:
-  std::pmr::memory_resource* memory_resource_;
+  //   std::pmr::memory_resource* memory_resource_;
   SharedMutexManager<std::string, std::string_view> path_lock_manager_;
 };
 

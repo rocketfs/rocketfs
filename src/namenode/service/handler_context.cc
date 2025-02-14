@@ -1,3 +1,5 @@
+// Copyright 2025 RocketFS
+
 #include "namenode/service/handler_context.h"
 
 #include <gflags/gflags.h>
