@@ -7,6 +7,7 @@
 #include <flatbuffers/verifier.h>
 
 #include <span>
+#include <string>
 #include <utility>
 
 #include "common/logger.h"
