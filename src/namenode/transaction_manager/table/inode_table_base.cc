@@ -34,16 +34,16 @@ INode::INode(std::pmr::string basic_info_str, std::pmr::string timestamps_str)
   CHECK_NOTNULL(timestamps_);
 }
 
-int64_t INode::parent_inode_id() const {
-  return basic_info_->parent_inode_id();
+INodeID INode::parent_inode_id() const {
+  return {basic_info_->parent_inode_id()};
 }
 
 std::string_view INode::name() const {
   return {basic_info_->name()->c_str(), basic_info_->name()->size()};
 }
 
-int64_t INode::inode_id() const {
-  return basic_info_->inode_id();
+INodeID INode::inode_id() const {
+  return {basic_info_->inode_id()};
 }
 
 int64_t INode::created_txid() const {
@@ -66,21 +66,31 @@ int64_t INode::atime_in_nanoseconds() const {
   return timestamps_->atime_in_nanoseconds();
 }
 
+const INodeBasicInfo& INode::basic_info() const {
+  return *basic_info_;
+}
+
+const INodeTimestamps& INode::timestamps() const {
+  return *timestamps_;
+}
+
 INodeT::INodeT(const INode& inode) {
   inode.basic_info_->UnPackTo(&basic_info_);
   inode.timestamps_->UnPackTo(&timestamps_);
 }
 
-int64_t& INodeT::parent_inode_id() {
-  return basic_info_.parent_inode_id;
+INodeID& INodeT::parent_inode_id() {
+  static_assert(sizeof(INodeID) == sizeof(basic_info_.parent_inode_id));
+  return reinterpret_cast<INodeID&>(basic_info_.parent_inode_id);
 }
 
 std::string& INodeT::name() {
   return basic_info_.name;
 }
 
-int64_t& INodeT::inode_id() {
-  return basic_info_.inode_id;
+INodeID& INodeT::inode_id() {
+  static_assert(sizeof(INodeID) == sizeof(basic_info_.inode_id));
+  return reinterpret_cast<INodeID&>(basic_info_.inode_id);
 }
 
 int64_t& INodeT::created_txid() {
@@ -101,6 +111,46 @@ int64_t& INodeT::mtime_in_nanoseconds() {
 
 int64_t& INodeT::atime_in_nanoseconds() {
   return timestamps_.atime_in_nanoseconds;
+}
+
+INodeID INodeT::parent_inode_id() const {
+  return {basic_info_.parent_inode_id};
+}
+
+std::string_view INodeT::name() const {
+  return {basic_info_.name.c_str(), basic_info_.name.size()};
+}
+
+INodeID INodeT::inode_id() const {
+  return {basic_info_.inode_id};
+}
+
+int64_t INodeT::created_txid() const {
+  return basic_info_.created_txid;
+}
+
+int64_t INodeT::renamed_txid() const {
+  return basic_info_.renamed_txid;
+}
+
+int64_t INodeT::ctime_in_nanoseconds() const {
+  return timestamps_.ctime_in_nanoseconds;
+}
+
+int64_t INodeT::mtime_in_nanoseconds() const {
+  return timestamps_.mtime_in_nanoseconds;
+}
+
+int64_t INodeT::atime_in_nanoseconds() const {
+  return timestamps_.atime_in_nanoseconds;
+}
+
+const INodeBasicInfoT& INodeT::basic_info() const {
+  return basic_info_;
+}
+
+const INodeTimestampsT& INodeT::timestamps() const {
+  return timestamps_;
 }
 
 }  // namespace rocketfs

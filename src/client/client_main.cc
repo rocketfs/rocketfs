@@ -26,7 +26,6 @@
 #include <unifex/overload.hpp>
 #include <unifex/scheduler_concepts.hpp>
 #include <unifex/sender_for.hpp>
-#include <unifex/stop_when.hpp>
 #include <unifex/sync_wait.hpp>
 #include <unifex/task.hpp>
 #include <unifex/then.hpp>
@@ -34,72 +33,54 @@
 #include <unifex/when_all.hpp>
 #include <unifex/with_query_value.hpp>
 
+#include "common/logger.h"
 #include "src/proto/client_namenode.pb.h"
 
 unifex::task<void> make_ping_pong_request(
-    agrpc::GrpcContext& grpc_context,
-    rocketfs::ClientNamenodeService::Stub& stub) {
+    agrpc::GrpcContext* grpc_context,
+    rocketfs::ClientNamenodeService::Stub* stub) {
   using RPC = agrpc::ClientRPC<
       &rocketfs::ClientNamenodeService::Stub::PrepareAsyncPingPong>;
-
+  CHECK_NOTNULL(grpc_context);
+  CHECK_NOTNULL(stub);
   grpc::ClientContext client_context;
   client_context.set_deadline(std::chrono::system_clock::now() +
                               std::chrono::seconds(5));
-
   rocketfs::PingRequest request;
   rocketfs::PongResponse response;
   const auto status = co_await RPC::request(
-      grpc_context, stub, client_context, request, response);
-
-  //   abort_if_not(status.ok());
+      *grpc_context, *stub, client_context, request, response);
+  CHECK(status.ok());
   std::cout << "Server streaming: " << response.pong() << '\n';
 }
 
 unifex::task<void> make_mkdirs_request(
-    agrpc::GrpcContext& grpc_contxt,
-    rocketfs::ClientNamenodeService::Stub& stub) {
+    agrpc::GrpcContext* grpc_contxt,
+    rocketfs::ClientNamenodeService::Stub* stub) {
   using RPC = agrpc::ClientRPC<
       &rocketfs::ClientNamenodeService::Stub::PrepareAsyncMkdirs>;
+  CHECK_NOTNULL(grpc_contxt);
+  CHECK_NOTNULL(stub);
   grpc::ClientContext client_context;
   client_context.set_deadline(std::chrono::system_clock::now() +
                               std::chrono::seconds(5));
   rocketfs::MkdirsRequest request;
   rocketfs::MkdirsResponse response;
   const auto status = co_await RPC::request(
-      grpc_contxt, stub, client_context, request, response);
-  //   abort_if_not(status.ok());
-}
-
-using ServerStreamingClientRPC = agrpc::ClientRPC<
-    &rocketfs::ClientNamenodeService::Stub::PrepareAsyncPingPong>;
-
-struct ReadContext {
-  rocketfs::PongResponse response;
-  bool ok;
-};
-
-auto response_processor(rocketfs::PongResponse& response) {
-  return [&](bool ok) {
-    if (ok) {
-      std::cout << "Server streaming: " << response.pong() << '\n';
-    }
-  };
-}
-
-auto with_deadline(agrpc::GrpcContext& grpc_context,
-                   std::chrono::system_clock::time_point deadline) {
-  return unifex::stop_when(unifex::then(
-      agrpc::Alarm(grpc_context).wait(deadline), [](auto&&...) {}));
+      *grpc_contxt, *stub, client_context, request, response);
+  CHECK(status.ok());
 }
 
 template <class Sender>
-void run_grpc_context_for_sender(agrpc::GrpcContext& grpc_context,
+void run_grpc_context_for_sender(agrpc::GrpcContext* grpc_context,
                                  Sender&& sender) {
-  grpc_context.work_started();
+  CHECK_NOTNULL(grpc_context);
+  grpc_context->work_started();
   unifex::sync_wait(unifex::when_all(
-      unifex::finally(std::forward<Sender>(sender),
-                      unifex::just_from([&] { grpc_context.work_finished(); })),
-      unifex::just_from([&] { grpc_context.run(); })));
+      unifex::finally(std::forward<Sender>(sender), unifex::just_from([&] {
+                        grpc_context->work_finished();
+                      })),
+      unifex::just_from([&] { grpc_context->run(); })));
 }
 
 int main(int argc, const char** argv) {
@@ -112,9 +93,9 @@ int main(int argc, const char** argv) {
   agrpc::GrpcContext grpc_context;
 
   run_grpc_context_for_sender(
-      grpc_context,
+      &grpc_context,
       unifex::with_query_value(
-          unifex::when_all(make_mkdirs_request(grpc_context, stub)),
+          unifex::when_all(make_mkdirs_request(&grpc_context, &stub)),
           unifex::get_scheduler,
           unifex::inline_scheduler{}));
 }

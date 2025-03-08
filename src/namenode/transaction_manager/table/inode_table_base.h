@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <memory_resource>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -38,14 +39,17 @@ class INode {
   ~INode() = default;
 
   // Please keep the field order consistent with inode.fbs.
-  int64_t parent_inode_id() const;
+  INodeID parent_inode_id() const;
   std::string_view name() const;
-  int64_t inode_id() const;
+  INodeID inode_id() const;
   int64_t created_txid() const;
   int64_t renamed_txid() const;
   int64_t ctime_in_nanoseconds() const;
   int64_t mtime_in_nanoseconds() const;
   int64_t atime_in_nanoseconds() const;
+
+  const INodeBasicInfo& basic_info() const;
+  const INodeTimestamps& timestamps() const;
 
  private:
   std::pmr::string basic_info_str_;
@@ -59,6 +63,7 @@ class INode {
 
 class INodeT {
  public:
+  INodeT() = default;
   explicit INodeT(const INode& inode);
   INodeT(const INodeT&) = default;
   INodeT(INodeT&&) = default;
@@ -67,14 +72,26 @@ class INodeT {
   ~INodeT() = default;
 
   // Please keep the field order consistent with inode.fbs.
-  int64_t& parent_inode_id();
+  INodeID& parent_inode_id();
   std::string& name();
-  int64_t& inode_id();
+  INodeID& inode_id();
   int64_t& created_txid();
   int64_t& renamed_txid();
   int64_t& ctime_in_nanoseconds();
   int64_t& mtime_in_nanoseconds();
   int64_t& atime_in_nanoseconds();
+
+  INodeID parent_inode_id() const;
+  std::string_view name() const;
+  INodeID inode_id() const;
+  int64_t created_txid() const;
+  int64_t renamed_txid() const;
+  int64_t ctime_in_nanoseconds() const;
+  int64_t mtime_in_nanoseconds() const;
+  int64_t atime_in_nanoseconds() const;
+
+  const INodeBasicInfoT& basic_info() const;
+  const INodeTimestampsT& timestamps() const;
 
  private:
   INodeBasicInfoT basic_info_;
@@ -94,7 +111,7 @@ class INodeTableBase {
                       INodeID parent_inode_id,
                       std::string_view name,
                       INode* inode) = 0;
-  virtual void Write(const INode& original,
+  virtual void Write(const std::optional<INode>& original,
                      const INodeT& modified,
                      WriteBatchBase* write_batch) = 0;
 };

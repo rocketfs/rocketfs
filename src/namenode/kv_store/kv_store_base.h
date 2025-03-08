@@ -73,7 +73,7 @@ class KVStoreBase {
                       std::string_view key,
                       std::pmr::string* value) = 0;
   virtual std::unique_ptr<WriteBatchBase> CreateWriteBatch(
-      std::pmr::memory_resource* memory_resource) = 0;
+      std::pmr::polymorphic_allocator<std::byte> allocator) = 0;
   virtual Status Write(std::unique_ptr<WriteBatchBase> write_batch) = 0;
 };
 

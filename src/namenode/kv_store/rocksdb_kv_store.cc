@@ -10,7 +10,6 @@
 #include <initializer_list>
 #include <iterator>
 #include <memory>
-#include <memory_resource>
 #include <string>
 #include <utility>
 #include <vector>
@@ -65,11 +64,8 @@ void RocksDBWriteGroup::Delete(ColumnFamilyIndex cf_index,
 
 RocksDBWriteBatch::RocksDBWriteBatch(
     const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles,
-    std::pmr::memory_resource* memory_resource)
-    : cf_handles_(cf_handles),
-      write_groups_(memory_resource),
-      memory_resource_(memory_resource) {
-  CHECK_NOTNULL(memory_resource_);
+    std::pmr::polymorphic_allocator<std::byte> allocator)
+    : cf_handles_(cf_handles), write_groups_(allocator), allocator_(allocator) {
 }
 
 WriteGroupBase* RocksDBWriteBatch::AddWriteGroup() {
@@ -149,8 +145,8 @@ Status RocksDBKVStore::Read(SnapshotBase* snapshot,
 }
 
 std::unique_ptr<WriteBatchBase> RocksDBKVStore::CreateWriteBatch(
-    std::pmr::memory_resource* memory_resource) {
-  return std::make_unique<RocksDBWriteBatch>(cf_handles_, memory_resource);
+    std::pmr::polymorphic_allocator<std::byte> allocator) {
+  return std::make_unique<RocksDBWriteBatch>(cf_handles_, allocator);
 }
 
 Status RocksDBKVStore::Write(std::unique_ptr<WriteBatchBase> write_batch) {

@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory_resource>
 #include <string>
 #include <string_view>
@@ -13,7 +14,8 @@ namespace rocketfs {
 
 class INodeTable : public INodeTableBase {
  public:
-  INodeTable() = default;
+  INodeTable(KVStoreBase* kv_store,
+             const std::pmr::polymorphic_allocator<std::byte>& allocator);
   INodeTable(const INodeTable&) = delete;
   INodeTable(INodeTable&&) = delete;
   INodeTable& operator=(const INodeTable&) = delete;
@@ -24,13 +26,16 @@ class INodeTable : public INodeTableBase {
               INodeID parent_inode_id,
               std::string_view name,
               INode* inode) override;
+  void Write(const std::optional<INode>& original,
+             const INodeT& modified,
+             WriteBatchBase* write_batch) override;
 
  private:
   std::pmr::string EncodeKey(INodeID inode_id, std::string_view name);
 
  private:
-  std::pmr::memory_resource* memory_resource_;
   KVStoreBase* kv_store_;
+  std::pmr::polymorphic_allocator<std::byte> allocator_;
 };
 
 }  // namespace rocketfs

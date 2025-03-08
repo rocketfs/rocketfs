@@ -2,6 +2,7 @@
 #include <rocksdb/snapshot.h>
 #include <rocksdb/write_batch.h>
 
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <memory_resource>
@@ -16,6 +17,9 @@
 #include "namenode/kv_store/kv_store_base.h"
 
 namespace rocketfs {
+
+constexpr std::string_view kINodeBasicInfoCFName{"INodeBasicInfo"};
+constexpr std::string_view kINodeTimestampsCFName{"INodeTimestamps"};
 
 class RocksDBWriteGroup : public WriteGroupBase {
  public:
@@ -56,7 +60,7 @@ class RocksDBWriteGroup : public WriteGroupBase {
 class RocksDBWriteBatch : public WriteBatchBase {
  public:
   RocksDBWriteBatch(const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles,
-                    std::pmr::memory_resource* memory_resource);
+                    std::pmr::polymorphic_allocator<std::byte> allocator);
   RocksDBWriteBatch(const RocksDBWriteBatch&) = delete;
   RocksDBWriteBatch(RocksDBWriteBatch&&) = delete;
   RocksDBWriteBatch& operator=(const RocksDBWriteBatch&) = delete;
@@ -69,13 +73,13 @@ class RocksDBWriteBatch : public WriteBatchBase {
  private:
   const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles_;
   std::pmr::vector<std::unique_ptr<RocksDBWriteGroup>> write_groups_;
-  std::pmr::memory_resource* memory_resource_;
   rocksdb::WriteBatch write_batch_;
   std::pmr::vector<
       std::tuple<rocksdb::ColumnFamilyHandle*,
                  std::string,
                  std::variant<std::nullptr_t, std::optional<std::string_view>>>>
       condition_check_items_;
+  std::pmr::polymorphic_allocator<std::byte> allocator_;
 };
 
 class RocksDBSnapshot : public SnapshotBase {
@@ -110,7 +114,7 @@ class RocksDBKVStore : public KVStoreBase {
               std::string_view key,
               std::pmr::string* value) override;
   std::unique_ptr<WriteBatchBase> CreateWriteBatch(
-      std::pmr::memory_resource* memory_resource) override;
+      std::pmr::polymorphic_allocator<std::byte> allocator) override;
   Status Write(std::unique_ptr<WriteBatchBase> write_batch) override;
 
  private:
