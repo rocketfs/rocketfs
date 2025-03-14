@@ -1,5 +1,5 @@
 {
-  "image": "rocketfs726673/dev:main",
+  "image": "ghcr.io/rocketfs/rocketfs:mkdir",
   "customizations": {
     "vscode": {
       "extensions": [

@@ -2,7 +2,7 @@
 
 #include "namenode/common/shared_mutex_manager.h"
 
-#include <fmt/core.h>
+#include <fmt/base.h>
 #include <gtest/gtest.h>
 
 #include <atomic>
@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <unifex/coroutine.hpp>
 #include <unifex/detail/with_type_erased_tag_invoke.hpp>

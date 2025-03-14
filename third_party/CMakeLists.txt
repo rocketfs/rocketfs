@@ -104,6 +104,7 @@ set_library_paths(asio-grpc)
 set_library_paths(curl)
 set_library_paths(flatbuffers)
 set_library_paths(fmt)
+set_library_paths(libfuse)
 set_library_paths(gflags)
 set_library_paths(googletest)
 set_library_paths(grpc)
@@ -112,6 +113,7 @@ set_library_paths(jemalloc)
 set_library_paths(json)
 set_library_paths(libunifex)
 set_library_paths(libunwind)
+set_library_paths(magic_enum)
 set_library_paths(openssl)
 set_library_paths(opentelemetry)
 set_library_paths(prometheus_cpp)
@@ -119,6 +121,7 @@ set_library_paths(protobuf)
 set_library_paths(quill)
 set_library_paths(rocksdb)
 set_library_paths(snappy)
+set_library_paths(thread-pool)
 set_library_paths(zlib)
 set_library_paths(zstd)
 
@@ -224,6 +227,29 @@ ExternalProject_Add(
   LOG_OUTPUT_ON_FAILURE ON)
 
 ExternalProject_Add(
+  libfuse
+  PREFIX ${LIBFUSE_PREFIX}
+  GIT_REPOSITORY https://github.com/libfuse/libfuse.git
+  GIT_TAG fuse-3.16.2
+  GIT_SHALLOW ON
+  CONFIGURE_COMMAND
+    ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER}
+    meson setup ${LIBFUSE_PREFIX}/src/libfuse
+  COMMAND
+    meson configure -Dbuildtype=release -Ddefault_library=static
+    -Dprefer_static=true -Dc_args=${SANITIZER_FLAGS}
+    -Dc_link_args=${SANITIZER_FLAGS} -Dcpp_std=c++20
+    -Dcpp_args=${SANITIZER_FLAGS} -Dcpp_link_args=${SANITIZER_FLAGS}
+    -Dprefix=${LIBFUSE_OUTPUT}
+  COMMAND meson setup --reconfigure ${LIBFUSE_PREFIX}/src/libfuse
+  BUILD_COMMAND ninja
+  INSTALL_COMMAND ninja install
+  LOG_CONFIGURE ON
+  LOG_BUILD ON
+  LOG_INSTALL ON
+  LOG_OUTPUT_ON_FAILURE ON)
+
+ExternalProject_Add(
   gflags
   PREFIX ${GFLAGS_PREFIX}
   GIT_REPOSITORY https://github.com/gflags/gflags.git
@@ -298,8 +324,8 @@ ExternalProject_Add(
   GIT_REPOSITORY https://github.com/google/gtest-parallel.git
   GIT_TAG 96f4f904922f9bf66689e749c40f314845baaac8
   GIT_SHALLOW ON
-  CONFIGURE_COMMAND :
-  BUILD_COMMAND :
+  CONFIGURE_COMMAND echo
+  BUILD_COMMAND echo
   INSTALL_COMMAND rm -rf ${GTEST_PARALLEL_OUTPUT}
   COMMAND mkdir -p ${GTEST_PARALLEL_OUTPUT}
   COMMAND cp -r ${GTEST_PARALLEL_PREFIX}/src/gtest-parallel
@@ -364,6 +390,24 @@ ExternalProject_Add(
   COMMAND
     ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER}
     ./configure --disable-shared --enable-static --prefix=${LIBUNWIND_OUTPUT}
+  LOG_CONFIGURE ON
+  LOG_BUILD ON
+  LOG_INSTALL ON
+  LOG_OUTPUT_ON_FAILURE ON)
+
+ExternalProject_Add(
+  magic_enum
+  PREFIX ${MAGIC_ENUM_PREFIX}
+  GIT_REPOSITORY https://github.com/Neargye/magic_enum.git
+  GIT_TAG v0.9.7
+  GIT_SHALLOW ON
+  CMAKE_ARGS # -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+             -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+             # -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
+             -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
+             -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+             -DCMAKE_BUILD_TYPE=Release
+             -DCMAKE_INSTALL_PREFIX=${MAGIC_ENUM_OUTPUT}
   LOG_CONFIGURE ON
   LOG_BUILD ON
   LOG_INSTALL ON
@@ -508,6 +552,9 @@ ExternalProject_Add(
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
              -DCMAKE_BUILD_TYPE=Release
+             # https://github.com/facebook/rocksdb/blob/main/INSTALL.md
+             # ... a reasonable compromise is`PORTABLE=haswell` ...
+             -DPORTABLE=haswell
              -DCMAKE_INSTALL_PREFIX=${ROCKSDB_OUTPUT}
              -DWITH_GFLAGS=ON
              -Dgflags_DIR=${GFLAGS_OUTPUT}/lib/cmake/gflags
@@ -542,6 +589,23 @@ ExternalProject_Add(
              -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${SNAPPY_OUTPUT}
              -DSNAPPY_BUILD_TESTS=OFF
+  LOG_CONFIGURE ON
+  LOG_BUILD ON
+  LOG_INSTALL ON
+  LOG_OUTPUT_ON_FAILURE ON)
+
+ExternalProject_Add(
+  thread-pool
+  PREFIX ${THREAD_POOL_PREFIX}
+  GIT_REPOSITORY https://github.com/bshoshany/thread-pool.git
+  GIT_TAG v5.0.0
+  GIT_SHALLOW ON
+  CONFIGURE_COMMAND echo
+  BUILD_COMMAND echo
+  INSTALL_COMMAND rm -rf ${THREAD_POOL_OUTPUT}
+  COMMAND mkdir -p ${THREAD_POOL_OUTPUT}
+  COMMAND cp -r ${THREAD_POOL_PREFIX}/src/thread-pool/include
+          ${THREAD_POOL_OUTPUT}
   LOG_CONFIGURE ON
   LOG_BUILD ON
   LOG_INSTALL ON
@@ -587,7 +651,9 @@ ExternalProject_Add(
 install(
   FILES ${CMAKE_SOURCE_DIR}/gtest-parallelConfig.cmake
         ${CMAKE_SOURCE_DIR}/jemallocConfig.cmake
+        ${CMAKE_SOURCE_DIR}/libfuseConfig.cmake
         ${CMAKE_SOURCE_DIR}/libunwindConfig.cmake
+        ${CMAKE_SOURCE_DIR}/thread-poolConfig.cmake
         ${CMAKE_SOURCE_DIR}/Targets.cmake
         ${CMAKE_SOURCE_DIR}/ZLIBConfig.cmake
   DESTINATION ${CMAKE_BINARY_DIR}/output)

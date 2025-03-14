@@ -3,10 +3,16 @@
 #include "namenode/kv_store/rocksdb_kv_store.h"
 
 #include <gflags/gflags.h>
+#include <quill/LogMacros.h>
+#include <quill/core/ThreadContextManager.h>
 #include <rocksdb/options.h>
 #include <rocksdb/slice.h>
 #include <rocksdb/status.h>
+#include <rocksdb/write_batch.h>
 
+#include <algorithm>
+#include <coroutine>
+#include <expected>
 #include <initializer_list>
 #include <iterator>
 #include <memory>
@@ -14,6 +20,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <unifex/coroutine.hpp>
+#include <unifex/detail/with_type_erased_tag_invoke.hpp>
+#include <unifex/overload.hpp>
+#include <unifex/sender_for.hpp>
+#include <unifex/unstoppable.hpp>
 
 #include "common/logger.h"
 #include "common/status.h"
@@ -23,117 +35,30 @@ namespace rocketfs {
 
 DECLARE_string(rocksdb_kv_store_db_path);
 
-RocksDBWriteGroup::RocksDBWriteGroup(
+RocksDBTransaction::RocksDBTransaction(
+    rocksdb::DB* db,
     const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles,
-    rocksdb::WriteBatch* write_batch,
-    std::pmr::vector<std::tuple<
-        rocksdb::ColumnFamilyHandle*,
-        std::string,
-        std::variant<std::nullptr_t, std::optional<std::string_view>>>>*
-        condition_check_items)
-    : cf_handles_(cf_handles),
-      write_batch_(write_batch),
-      condition_check_items_(condition_check_items) {
-  CHECK_NOTNULL(write_batch);
-  CHECK_NOTNULL(condition_check_items);
+    int64_t start_version,
+    RequestScopedAllocator allocator)
+    : db_(db),
+      cf_handles_(cf_handles),
+      snapshot_(CHECK_NOTNULL(CHECK_NOTNULL(db_)->GetSnapshot()),
+                [db](const auto* snapshot) {
+                  CHECK_NOTNULL(db);
+                  CHECK_NOTNULL(snapshot);
+                  db->ReleaseSnapshot(snapshot);
+                }),
+      start_version_(start_version),
+      commit_version_(-1),
+      allocator_(allocator) {
 }
 
-void RocksDBWriteGroup::ConditionCheck(
+std::expected<std::pmr::string, Status> RocksDBTransaction::Get(
     ColumnFamilyIndex cf_index,
     std::string_view key,
-    std::variant<std::nullptr_t, std::optional<std::string_view>> expected) {
-  CHECK_GE(cf_index.index, 0);
-  CHECK_LT(cf_index.index, cf_handles_.size());
-  condition_check_items_->emplace_back(
-      cf_handles_[cf_index.index], key, std::move(expected));
-}
-
-void RocksDBWriteGroup::Put(ColumnFamilyIndex cf_index,
-                            std::string_view key,
-                            std::string_view value) {
-  CHECK_GE(cf_index.index, 0);
-  CHECK_LT(cf_index.index, cf_handles_.size());
-  CHECK(write_batch_->Put(cf_handles_[cf_index.index], key, value).ok());
-}
-
-void RocksDBWriteGroup::Delete(ColumnFamilyIndex cf_index,
-                               std::string_view key) {
-  CHECK_GE(cf_index.index, 0);
-  CHECK_LT(cf_index.index, cf_handles_.size());
-  CHECK(write_batch_->Delete(cf_handles_[cf_index.index], key).ok());
-}
-
-RocksDBWriteBatch::RocksDBWriteBatch(
-    const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles,
-    std::pmr::memory_resource* memory_resource)
-    : cf_handles_(cf_handles),
-      write_groups_(memory_resource),
-      memory_resource_(memory_resource) {
-  CHECK_NOTNULL(memory_resource_);
-}
-
-WriteGroupBase* RocksDBWriteBatch::AddWriteGroup() {
-  auto write_group = std::make_unique<RocksDBWriteGroup>(
-      cf_handles_, &write_batch_, &condition_check_items_);
-  write_groups_.push_back(std::move(write_group));
-  return write_groups_.back().get();
-}
-
-rocksdb::WriteBatch* RocksDBWriteBatch::GetWriteBatch() {
-  return &write_batch_;
-}
-
-RocksDBSnapshot::RocksDBSnapshot(rocksdb::DB* db) {
-  CHECK_NOTNULL(db);
-  auto snapshot = db->GetSnapshot();
-  CHECK_NOTNULL(snapshot);
-  snapshot_ = decltype(snapshot_)(snapshot, [db](const auto* snapshot) {
-    CHECK_NOTNULL(db);
-    CHECK_NOTNULL(snapshot);
-    db->ReleaseSnapshot(snapshot);
-  });
-}
-
-const rocksdb::Snapshot* RocksDBSnapshot::GetSnapshot() {
-  CHECK_NOTNULL(snapshot_);
-  return snapshot_.get();
-}
-
-RocksDBKVStore::RocksDBKVStore() {
-  rocksdb::Options options;
-  options.create_if_missing = true;
-  rocksdb::DB* db = nullptr;
-  std::vector<rocksdb::ColumnFamilyDescriptor> cf_descriptors{
-      rocksdb::ColumnFamilyDescriptor(std::string(kINodeBasicInfoCFName), {}),
-      rocksdb::ColumnFamilyDescriptor(std::string(kINodeTimestampsCFName), {})};
-  CHECK(rocksdb::DB::Open(
-            options, "/tmp/rocksdb", cf_descriptors, &cf_handles_, &db)
-            .ok());
-  CHECK_EQ(cf_handles_.size(), cf_descriptors.size());
-  for (auto [cf_index, cf_name] :
-       std::initializer_list<std::pair<ColumnFamilyIndex, std::string_view>>{
-           {kINodeBasicInfoCFIndex, kINodeBasicInfoCFName},
-           {kINodeTimestampsCFIndex, kINodeTimestampsCFName}}) {
-    CHECK_EQ(cf_handles_[cf_index.index]->GetName(), cf_name);
-  }
-  db_ = std::unique_ptr<rocksdb::DB>(db);
-}
-
-std::unique_ptr<SnapshotBase> RocksDBKVStore::GetSnapshot() {
-  return std::make_unique<RocksDBSnapshot>(db_.get());
-}
-
-Status RocksDBKVStore::Read(SnapshotBase* snapshot,
-                            ColumnFamilyIndex cf_index,
-                            std::string_view key,
-                            std::pmr::string* value) {
-  CHECK_NOTNULL(value);
+    bool exclude_from_read_conflict) {
   rocksdb::ReadOptions read_options;
-  if (snapshot != nullptr) {
-    auto rocksdb_snapshot = dynamic_cast<RocksDBSnapshot*>(snapshot);
-    CHECK_NOTNULL(rocksdb_snapshot);
-    read_options.snapshot = rocksdb_snapshot->GetSnapshot();
-  }
+  read_options.snapshot = snapshot_.get();
   CHECK_NE(cf_index, kInvalidCFIndex);
   CHECK_GE(cf_index.index, 0);
   CHECK_LT(cf_index.index, cf_handles_.size());
@@ -141,28 +66,170 @@ Status RocksDBKVStore::Read(SnapshotBase* snapshot,
   rocksdb::Status status =
       db_->Get(read_options, cf_handles_[cf_index.index], key, &pinnable_slice);
   CHECK(status.ok() || status.IsNotFound());
+
   if (!status.ok()) {
-    return Status::NotFoundError();
+    if (!exclude_from_read_conflict) {
+      AddReadConflictKey(cf_index, key, std::monostate{});
+    }
+    return std::unexpected(Status::NotFoundError());
   }
-  value->assign(pinnable_slice.data(), pinnable_slice.size());
-  return Status::OK();
+
+  std::pmr::string value(allocator_);
+  value.assign(pinnable_slice.data(), pinnable_slice.size());
+  if (!exclude_from_read_conflict) {
+    AddReadConflictKey(cf_index, key, value);
+  }
+  return value;
 }
 
-std::unique_ptr<WriteBatchBase> RocksDBKVStore::CreateWriteBatch(
-    std::pmr::memory_resource* memory_resource) {
-  return std::make_unique<RocksDBWriteBatch>(cf_handles_, memory_resource);
+void RocksDBTransaction::AddReadConflictKey(
+    ColumnFamilyIndex cf_index,
+    std::string_view key,
+    std::variant<std::monostate, std::optional<std::string_view>> value) {
+  CHECK_GE(cf_index.index, 0);
+  CHECK_LT(cf_index.index, cf_handles_.size());
+  read_set_[std::make_pair(cf_index, std::string(key))] =
+      value.index() == 0
+          ? std::nullopt
+          : std::get<1>(value).transform(
+                [this](std::string_view value) { return std::string(value); });
 }
 
-Status RocksDBKVStore::Write(std::unique_ptr<WriteBatchBase> write_batch) {
-  CHECK_NOTNULL(write_batch);
-  auto rocksdb_write_batch =
-      dynamic_cast<RocksDBWriteBatch*>(write_batch.get());
-  CHECK_NOTNULL(rocksdb_write_batch);
-  rocksdb::WriteOptions write_options;
-  rocksdb::Status status =
-      db_->Write(write_options, rocksdb_write_batch->GetWriteBatch());
+void RocksDBTransaction::Put(ColumnFamilyIndex cf_index,
+                             std::string_view key,
+                             std::string_view value) {
+  CHECK_GE(cf_index.index, 0);
+  CHECK_LT(cf_index.index, cf_handles_.size());
+  write_set_[std::make_pair(cf_index, std::string(key))] = value;
+}
+
+void RocksDBTransaction::Delete(ColumnFamilyIndex cf_index,
+                                std::string_view key) {
+  CHECK_GE(cf_index.index, 0);
+  CHECK_LT(cf_index.index, cf_handles_.size());
+  write_set_[std::make_pair(cf_index, std::string(key))] = std::nullopt;
+}
+
+RocksDBConflictDetector::RocksDBConflictDetector(int64_t latest_purged_version)
+    : latest_purged_version_(latest_purged_version) {
+}
+
+unifex::task<bool> RocksDBConflictDetector::IsConflictFree(
+    std::shared_ptr<const RocksDBTransaction> transaction) {
+  co_await mutex_.async_lock();
+
+  CHECK_GT(transaction->start_version_, 0);
+  CHECK_GT(transaction->commit_version_, transaction->start_version_);
+  if (transaction->start_version_ < latest_purged_version_) {
+    mutex_.unlock();
+    co_return false;
+  }
+
+  // Ensuring no cycles in the direct serialization graph guarantees transaction
+  // serializability. [Weak Consistency: A Generalized Theory and Optimistic
+  // Implementations for Distributed
+  // Transactions](https://pmg.csail.mit.edu/papers/adya-phd.pdf) explains this
+  // principle.
+  // [FoundationDB](https://apple.github.io/foundationdb/developer-guide.html#how-foundationdb-detects-conflicts)
+  // simplifies conflict detection with three steps:
+  // 1. Assign a read version at the first read.
+  // 2. Assign a commit version at commit.
+  // 3. A transaction is conflict free if and only if there have been no writes
+  //    to any key that was read by that transaction between the time the
+  //    transaction started and the commit time.
+  bool is_conflict_free = !std::any_of(
+      committed_transactions_.lower_bound(transaction->start_version_),
+      committed_transactions_.upper_bound(transaction->commit_version_),
+      [this, transaction = transaction.get()](const auto& p) {
+        const auto& [version, previous_committed_transaction] = p;
+        CHECK_EQ(version, previous_committed_transaction->commit_version_);
+        return HasConflict(*transaction, *previous_committed_transaction);
+      });
+  LOG_DEBUG(logger,
+            "Transaction {} is conflict-free: {}.",
+            transaction->commit_version_,
+            is_conflict_free);
+  mutex_.unlock();
+  co_return is_conflict_free;
+}
+
+bool RocksDBConflictDetector::HasConflict(
+    const RocksDBTransaction& transaction,
+    const RocksDBTransaction& concurrent_transaction) const {
+  CHECK_LT(transaction.start_version_, concurrent_transaction.commit_version_);
+  CHECK_GT(transaction.commit_version_, concurrent_transaction.commit_version_);
+  return std::any_of(concurrent_transaction.write_set_.begin(),
+                     concurrent_transaction.write_set_.end(),
+                     [&transaction](const auto& p) {
+                       const auto& [key_with_cf, value] = p;
+                       return transaction.read_set_.find(key_with_cf) !=
+                              transaction.read_set_.end();
+                     });
+}
+
+unifex::task<void> RocksDBConflictDetector::PurgeTo(int64_t version) {
+  co_await mutex_.async_lock();
+  committed_transactions_.erase(committed_transactions_.begin(),
+                                committed_transactions_.upper_bound(version));
+  if (version > latest_purged_version_) {
+    latest_purged_version_ = version;
+  }
+  mutex_.unlock();
+}
+
+RocksDBKVStore::RocksDBKVStore()
+    : version_(1), conflict_detector_(version_ - 1) {
+  rocksdb::Options options;
+  options.create_if_missing = true;
+  options.create_missing_column_families = true;
+  rocksdb::DB* db = nullptr;
+  std::vector<rocksdb::ColumnFamilyDescriptor> cf_descriptors{
+      rocksdb::ColumnFamilyDescriptor(std::string(kDefaultCFName), {}),
+      rocksdb::ColumnFamilyDescriptor(std::string(kInodeBasicInfoCFName), {}),
+      rocksdb::ColumnFamilyDescriptor(std::string(kInodeTimestampsCFName), {})};
+  auto status = rocksdb::DB::Open(
+      options, "/tmp/rocksdb", cf_descriptors, &cf_handles_, &db);
+  LOG_INFO(logger, "RocksDB open status: {}.", status.ToString());
   CHECK(status.ok());
-  return Status::OK();
+  CHECK_EQ(cf_handles_.size(), cf_descriptors.size());
+  for (auto [cf_index, cf_name] :
+       std::initializer_list<std::pair<ColumnFamilyIndex, std::string_view>>{
+           {kInodeBasicInfoCFIndex, kInodeBasicInfoCFName},
+           {kInodeTimestampsCFIndex, kInodeTimestampsCFName}}) {
+    CHECK_EQ(cf_handles_[cf_index.index]->GetName(), cf_name);
+  }
+  db_ = std::unique_ptr<rocksdb::DB>(db);
+}
+
+std::unique_ptr<TransactionBase> RocksDBKVStore::StartTransaction(
+    RequestScopedAllocator allocator) {
+  return std::make_unique<RocksDBTransaction>(
+      db_.get(), cf_handles_, version_.fetch_add(1), allocator);
+}
+
+unifex::task<std::expected<void, Status>> RocksDBKVStore::CommitTransaction(
+    std::unique_ptr<TransactionBase> transaction) {
+  auto rocksdb_transaction = std::shared_ptr<RocksDBTransaction>(
+      dynamic_cast<RocksDBTransaction*>(transaction.release()));
+  CHECK(static_cast<bool>(rocksdb_transaction));
+  rocksdb_transaction->commit_version_ = version_.fetch_add(1);
+  if (!co_await conflict_detector_.IsConflictFree(rocksdb_transaction)) {
+    LOG_DEBUG(logger,
+              "Transaction {} was aborted due to a conflict.",
+              rocksdb_transaction->commit_version_);
+    co_return std::unexpected(Status::ConflictError());
+  }
+  rocksdb::WriteBatch write_batch;
+  for (const auto& [key_with_cf, value] : rocksdb_transaction->write_set_) {
+    const auto& [cf_index, key] = key_with_cf;
+    if (value) {
+      write_batch.Put(cf_handles_[cf_index.index], key, *value);
+    } else {
+      write_batch.Delete(cf_handles_[cf_index.index], key);
+    }
+  }
+  CHECK(db_->Write(rocksdb::WriteOptions(), &write_batch).ok());
+  co_return std::expected<void, Status>();
 }
 
 }  // namespace rocketfs
