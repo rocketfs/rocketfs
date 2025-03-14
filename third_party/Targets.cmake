@@ -15,6 +15,7 @@ list(
   ${CMAKE_CURRENT_LIST_DIR}/grpc/lib/cmake/re2
   ${CMAKE_CURRENT_LIST_DIR}/json/share/cmake/nlohmann_json
   ${CMAKE_CURRENT_LIST_DIR}/libunifex/lib/cmake/unifex
+  ${CMAKE_CURRENT_LIST_DIR}/magic_enum/cmake/magic_enum
   ${CMAKE_CURRENT_LIST_DIR}/openssl/lib64/cmake/OpenSSL
   ${CMAKE_CURRENT_LIST_DIR}/opentelemetry/lib/cmake/opentelemetry-cpp
   ${CMAKE_CURRENT_LIST_DIR}/prometheus_cpp/lib/cmake/prometheus-cpp

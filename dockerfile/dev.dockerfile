@@ -7,18 +7,21 @@ FROM debian:bookworm-20241223
 # Always use `set -eo pipefail`.
 # Fail fast and be aware of exit codes.
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-RUN apt-get update                                   &&\
-  apt-get install -y --no-install-recommends           \
-  apt-transport-https=2.6.1 ca-certificates=20230311   \
-  gnupg2=2.2.40-1.1                                    \
-  git=1:2.39.5-0+deb12u1 wget=1.21.3-1+b2              \
-  autoconf=2.71-3 automake=1:1.16.5-1.3                \
-  build-essential=12.9 libtool=2.4.7-7~deb12u1         \
-  cmake=3.25.1-1 make=4.3-4.1                          \
-  python3=3.11.2-1+b1 python3-pip=23.0.1+dfsg-1        \
-  gcc=4:12.2.0-3 g++=4:12.2.0-3 gdb=13.1-3           &&\
-  apt-get clean                                      &&\
+RUN apt-get update                                          &&\
+  apt-get install -y --no-install-recommends                  \
+  apt-transport-https=2.6.1 ca-certificates=20230311          \
+  gnupg2=2.2.40-1.1                                           \
+  git=1:2.39.5-0+deb12u2 wget=1.21.3-1+deb12u1 unzip=6.0-28   \
+  autoconf=2.71-3 automake=1:1.16.5-1.3                       \
+  build-essential=12.9 libtool=2.4.7-7~deb12u1                \
+  cmake=3.25.1-1 meson=1.0.1-5 make=4.3-4.1                   \
+  python3=3.11.2-1+b1 python3-pip=23.0.1+dfsg-1               \
+  gcc=4:12.2.0-3 g++=4:12.2.0-3 gdb=13.1-3                  &&\
+  apt-get clean                                             &&\
   rm -rf /var/lib/apt/lists/*
+RUN wget -qO- https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip  |\
+  funzip >/usr/bin/ninja                                                                     &&\
+  chmod +x /usr/bin/ninja
 # https://apt.llvm.org/
 RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key    |\
   tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc              &&\

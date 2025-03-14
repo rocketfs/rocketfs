@@ -1,42 +1,68 @@
 #include <rocksdb/db.h>
 #include <rocksdb/snapshot.h>
-#include <rocksdb/write_batch.h>
 
+#include <atomic>
+#include <compare>
+#include <cstdint>
+#include <expected>
 #include <functional>
+#include <iterator>
+#include <map>
 #include <memory>
-#include <memory_resource>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <tuple>
+#include <utility>
 #include <variant>
 #include <vector>
-#include <version>
 
+#include <unifex/async_mutex.hpp>
+#include <unifex/task.hpp>
+
+#include "common/status.h"
+#include "namenode/common/request_scoped_allocator.h"
+#include "namenode/kv_store/column_family.h"
 #include "namenode/kv_store/kv_store_base.h"
 
 namespace rocketfs {
 
-class RocksDBWriteGroup : public WriteGroupBase {
- public:
-  RocksDBWriteGroup(
-      const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles,
-      rocksdb::WriteBatch* write_batch,
-      std::pmr::vector<std::tuple<
-          rocksdb::ColumnFamilyHandle*,
-          std::string,
-          std::variant<std::nullptr_t, std::optional<std::string_view>>>>*
-          condition_check_items);
-  RocksDBWriteGroup(const RocksDBWriteGroup&) = delete;
-  RocksDBWriteGroup(RocksDBWriteGroup&&) = delete;
-  RocksDBWriteGroup& operator=(const RocksDBWriteGroup&) = delete;
-  RocksDBWriteGroup& operator=(RocksDBWriteGroup&&) = delete;
-  ~RocksDBWriteGroup() override = default;
+constexpr std::string_view kDefaultCFName{"default"};
+constexpr std::string_view kInodeBasicInfoCFName{"InodeBasicInfo"};
+constexpr std::string_view kInodeTimestampsCFName{"InodeTimestamps"};
 
-  void ConditionCheck(
+class RocksDBTransaction : public TransactionBase {
+  friend class RocksDBKVStore;
+  friend class RocksDBConflictDetector;
+
+  struct Comparator {
+    bool operator()(
+        const std::pair<ColumnFamilyIndex, std::string>& lhs,
+        const std::pair<ColumnFamilyIndex, std::string>& rhs) const {
+      return lhs.first.index < rhs.first.index ||
+             (lhs.first.index == rhs.first.index && lhs.second < rhs.second);
+    }
+  };
+
+ public:
+  RocksDBTransaction(
+      rocksdb::DB* db,
+      const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles,
+      int64_t start_version,
+      RequestScopedAllocator allocator);
+  RocksDBTransaction(const RocksDBTransaction&) = delete;
+  RocksDBTransaction(RocksDBTransaction&&) = delete;
+  RocksDBTransaction& operator=(const RocksDBTransaction&) = delete;
+  RocksDBTransaction& operator=(RocksDBTransaction&&) = delete;
+  ~RocksDBTransaction() = default;
+
+  std::expected<std::pmr::string, Status> Get(
       ColumnFamilyIndex cf_index,
       std::string_view key,
-      std::variant<std::nullptr_t, std::optional<std::string_view>> expected)
+      bool exclude_from_read_conflict) override;
+  void AddReadConflictKey(
+      ColumnFamilyIndex cf_index,
+      std::string_view key,
+      std::variant<std::monostate, std::optional<std::string_view>> value)
       override;
   void Put(ColumnFamilyIndex cf_index,
            std::string_view key,
@@ -44,55 +70,47 @@ class RocksDBWriteGroup : public WriteGroupBase {
   void Delete(ColumnFamilyIndex cf_index, std::string_view key) override;
 
  private:
+  rocksdb::DB* db_;
   const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles_;
-  rocksdb::WriteBatch* write_batch_;
-  std::pmr::vector<std::tuple<
-      rocksdb::ColumnFamilyHandle*,
-      std::string,
-      std::variant<std::nullptr_t, std::optional<std::string_view>>>>*
-      condition_check_items_;
-};
-
-class RocksDBWriteBatch : public WriteBatchBase {
- public:
-  RocksDBWriteBatch(const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles,
-                    std::pmr::memory_resource* memory_resource);
-  RocksDBWriteBatch(const RocksDBWriteBatch&) = delete;
-  RocksDBWriteBatch(RocksDBWriteBatch&&) = delete;
-  RocksDBWriteBatch& operator=(const RocksDBWriteBatch&) = delete;
-  RocksDBWriteBatch& operator=(RocksDBWriteBatch&&) = delete;
-  ~RocksDBWriteBatch() override = default;
-
-  WriteGroupBase* AddWriteGroup() override;
-  rocksdb::WriteBatch* GetWriteBatch();
-
- private:
-  const std::vector<rocksdb::ColumnFamilyHandle*>& cf_handles_;
-  std::pmr::vector<std::unique_ptr<RocksDBWriteGroup>> write_groups_;
-  std::pmr::memory_resource* memory_resource_;
-  rocksdb::WriteBatch write_batch_;
-  std::pmr::vector<
-      std::tuple<rocksdb::ColumnFamilyHandle*,
-                 std::string,
-                 std::variant<std::nullptr_t, std::optional<std::string_view>>>>
-      condition_check_items_;
-};
-
-class RocksDBSnapshot : public SnapshotBase {
- public:
-  explicit RocksDBSnapshot(rocksdb::DB* db);
-  RocksDBSnapshot(const RocksDBSnapshot&) = delete;
-  RocksDBSnapshot(RocksDBSnapshot&&) = delete;
-  RocksDBSnapshot& operator=(const RocksDBSnapshot&) = delete;
-  RocksDBSnapshot& operator=(RocksDBSnapshot&&) = delete;
-  ~RocksDBSnapshot() = default;
-
-  const rocksdb::Snapshot* GetSnapshot();
-
- private:
   std::unique_ptr<const rocksdb::Snapshot,
                   std::function<void(const rocksdb::Snapshot*)>>
       snapshot_;
+
+  int64_t start_version_;
+  int64_t commit_version_;
+  std::map<std::pair<ColumnFamilyIndex, std::string>,
+           std::variant<std::monostate, std::optional<std::string>>,
+           Comparator>
+      read_set_;
+  std::map<std::pair<ColumnFamilyIndex, std::string>,
+           std::optional<std::string>,
+           Comparator>
+      write_set_;
+
+  RequestScopedAllocator allocator_;
+};
+
+class RocksDBConflictDetector {
+ public:
+  explicit RocksDBConflictDetector(int64_t latest_purged_version);
+  RocksDBConflictDetector(RocksDBConflictDetector&&) = delete;
+  RocksDBConflictDetector& operator=(const RocksDBConflictDetector&) = delete;
+  RocksDBConflictDetector& operator=(RocksDBConflictDetector&&) = delete;
+  ~RocksDBConflictDetector() = default;
+
+  unifex::task<bool> IsConflictFree(
+      std::shared_ptr<const RocksDBTransaction> transaction);
+
+ private:
+  bool HasConflict(const RocksDBTransaction& transaction,
+                   const RocksDBTransaction& concurrent_transaction) const;
+  unifex::task<void> PurgeTo(int64_t version);
+
+ private:
+  unifex::async_mutex mutex_;
+  std::map<int64_t, std::shared_ptr<RocksDBTransaction>>
+      committed_transactions_;
+  int64_t latest_purged_version_;
 };
 
 class RocksDBKVStore : public KVStoreBase {
@@ -104,18 +122,16 @@ class RocksDBKVStore : public KVStoreBase {
   RocksDBKVStore& operator=(RocksDBKVStore&&) = delete;
   ~RocksDBKVStore() override = default;
 
-  std::unique_ptr<SnapshotBase> GetSnapshot() override;
-  Status Read(SnapshotBase* snapshot,
-              ColumnFamilyIndex cf_index,
-              std::string_view key,
-              std::pmr::string* value) override;
-  std::unique_ptr<WriteBatchBase> CreateWriteBatch(
-      std::pmr::memory_resource* memory_resource) override;
-  Status Write(std::unique_ptr<WriteBatchBase> write_batch) override;
+  std::unique_ptr<TransactionBase> StartTransaction(
+      RequestScopedAllocator allocator) override;
+  unifex::task<std::expected<void, Status>> CommitTransaction(
+      std::unique_ptr<TransactionBase> transaction) override;
 
  private:
   std::unique_ptr<rocksdb::DB> db_;
   std::vector<rocksdb::ColumnFamilyHandle*> cf_handles_;
+  std::atomic<int64_t> version_;
+  RocksDBConflictDetector conflict_detector_;
 };
 
 }  // namespace rocketfs

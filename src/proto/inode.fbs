@@ -1,12 +1,25 @@
-table INodeBasicInfo {
+namespace rocketfs.serde;
+
+table File {
+  length:long;
+}
+table Directory {
   parent_inode_id:long;
   name:string;
+}
+union InodeType {
+  File,
+  Directory,
+}
+
+table InodeBasicInfo {
   inode_id:long;
+  inode_type:InodeType;
   created_txid:long;
   renamed_txid:long;
 }
 
-table INodeTimestamps {
+table InodeTimestamps {
   ctime_in_nanoseconds:long;
   mtime_in_nanoseconds:long;
   atime_in_nanoseconds:long;

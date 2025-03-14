@@ -20,10 +20,8 @@ inline bool operator!=(const ColumnFamilyIndex& lhs,
 }
 
 constexpr ColumnFamilyIndex kInvalidCFIndex{-1};
-constexpr ColumnFamilyIndex kINodeBasicInfoCFIndex{0};
-constexpr ColumnFamilyIndex kINodeTimestampsCFIndex{1};
-
-constexpr std::string_view kINodeBasicInfoCFName{"INodeBasicInfo"};
-constexpr std::string_view kINodeTimestampsCFName{"INodeTimestamps"};
+constexpr ColumnFamilyIndex kDefaultCFIndex{0};
+constexpr ColumnFamilyIndex kInodeBasicInfoCFIndex{1};
+constexpr ColumnFamilyIndex kInodeTimestampsCFIndex{2};
 
 }  // namespace rocketfs

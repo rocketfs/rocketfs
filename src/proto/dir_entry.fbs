@@ -1,0 +1,7 @@
+namespace rocketfs.serde;
+
+table DirEntry {
+  parent_inode_id:long;
+  name:string;
+  inode_id:long;
+}

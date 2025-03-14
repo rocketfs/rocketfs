@@ -4,7 +4,7 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    container: rocketfs726673/dev:main
+    container: ghcr.io/rocketfs/rocketfs:mkdir
     strategy:
       fail-fast: true
       matrix:

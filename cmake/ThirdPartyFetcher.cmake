@@ -12,23 +12,23 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   if(ENABLE_UNDEFINED_BEHAVIOR_SANITIZER OR ENABLE_ADDRESS_SANITIZER)
     FetchContent_Declare(
       RocketFSThirdParty
-      URL https://rocketfs.oss-rg-china-mainland.aliyuncs.com/third-party-artifact-b73737c-clang-asan-ON-tsan-OFF.tar.gz
+      URL https://rocketfs.oss-rg-china-mainland.aliyuncs.com/third-party-artifact-deab3bf-clang-asan-ON-tsan-OFF.tar.gz
     )
   elseif(ENABLE_THREAD_SANITIZER)
     FetchContent_Declare(
       RocketFSThirdParty
-      URL https://rocketfs.oss-rg-china-mainland.aliyuncs.com/third-party-artifact-b73737c-clang-asan-OFF-tsan-ON.tar.gz
+      URL https://rocketfs.oss-rg-china-mainland.aliyuncs.com/third-party-artifact-deab3bf-clang-asan-OFF-tsan-ON.tar.gz
     )
   else()
     FetchContent_Declare(
       RocketFSThirdParty
-      URL https://rocketfs.oss-rg-china-mainland.aliyuncs.com/third-party-artifact-b73737c-clang-asan-OFF-tsan-OFF.tar.gz
+      URL https://rocketfs.oss-rg-china-mainland.aliyuncs.com/third-party-artifact-deab3bf-clang-asan-OFF-tsan-OFF.tar.gz
     )
   endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   FetchContent_Declare(
     RocketFSThirdParty
-    URL https://rocketfs.oss-rg-china-mainland.aliyuncs.com/third-party-artifact-b73737c-gcc-asan-OFF-tsan-OFF.tar.gz
+    URL https://rocketfs.oss-rg-china-mainland.aliyuncs.com/third-party-artifact-deab3bf-gcc-asan-OFF-tsan-OFF.tar.gz
   )
 else()
   message(FATAL_ERROR "Unsupported compiler. Only Clang and GCC are supported.")

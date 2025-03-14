@@ -2,8 +2,10 @@
 
 #include <memory>
 
+#include "common/time_util.h"
+#include "namenode/common/id_generator.h"
 #include "namenode/kv_store/kv_store_base.h"
-#include "namenode/path_resolver/path_resolver_base.h"
+#include "namenode/table/inode_table_base.h"
 
 namespace rocketfs {
 
@@ -16,12 +18,18 @@ class NameNodeContext {
   NameNodeContext& operator=(NameNodeContext&&) = delete;
   ~NameNodeContext() = default;
 
+  void Start();
+  void Stop();
+
   KVStoreBase* GetKVStore();
-  PathResolverBase* GetPathResolver();
+  TimeUtilBase* GetTimeUtil();
+  InodeIDGenerator& GetInodeIDGenerator();
 
  private:
+  std::unique_ptr<TimeUtilBase> time_util_;
   std::unique_ptr<KVStoreBase> kv_store_;
-  std::unique_ptr<PathResolverBase> path_resolver_;
+  IDGeneratorManager id_generator_manager_;
+  std::unique_ptr<InodeIDGenerator> inode_id_generator_;
 };
 
 }  // namespace rocketfs

@@ -32,7 +32,7 @@ else()
   message(STATUS "CMAKE_CXX_COMPILER is set to: ${CMAKE_CXX_COMPILER}.")
 endif()
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -67,6 +67,7 @@ target_link_libraries(
   PUBLIC RocksDB::rocksdb
          asio-grpc::asio-grpc-unifex
          fmt::fmt-header-only
+         libfuse
          gRPC::grpc++
          gRPC::grpc++_unsecure
          gflags::gflags_static
@@ -78,6 +79,14 @@ target_compile_definitions(
   PUBLIC UNIFEX_NO_ASYNC_STACKS
   PUBLIC UNIFEX_LOG_DANGLING_STOP_CALLBACKS=OFF)
 
+file(GLOB_RECURSE MAIN_SOURCES "src/*_main.cc")
+foreach(main_file ${MAIN_SOURCES})
+  get_filename_component(file_name ${main_file} NAME_WE)
+  string(REPLACE "_main" "" exec_name ${file_name})
+  add_executable(${exec_name} ${main_file})
+  target_link_libraries(${exec_name} PRIVATE rocketfs)
+endforeach()
+
 file(GLOB_RECURSE test-srcs ${CMAKE_SOURCE_DIR}/test/*_test.cc)
 add_executable(test ${test-srcs})
-target_link_libraries(test PUBLIC rocketfs GTest::gtest_main)
+target_link_libraries(test PRIVATE rocketfs GTest::gtest_main)
