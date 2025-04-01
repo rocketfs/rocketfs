@@ -1,0 +1,16 @@
+include "inode.fbs";
+
+namespace rocketfs.serde;
+
+table HardLink {
+  parent_id:ulong;
+  name:string;
+  id:ulong;
+}
+union DEntType {
+  HardLink,
+  Dir,
+}
+table DEnt {
+  type:DEntType;
+}

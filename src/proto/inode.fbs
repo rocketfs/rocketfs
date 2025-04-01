@@ -1,26 +1,28 @@
 namespace rocketfs.serde;
 
-table File {
-  length:long;
+table Acl {
+  uid:uint32;
+  gid:uint32;
+  perm:uint64;
 }
-table Directory {
-  parent_inode_id:long;
+
+table File {
+  id:ulong;
+  acl:Acl;
+  ctime_in_ns:long;
+  // MTime and ATime are stored in different column families.
+}
+table Dir {
+  parent_id:ulong;
   name:string;
+  id:ulong;
+  acl:Acl;
+  ctime_in_ns:long;
 }
 union InodeType {
   File,
-  Directory,
+  Dir,
 }
-
-table InodeBasicInfo {
-  inode_id:long;
-  inode_type:InodeType;
-  created_txid:long;
-  renamed_txid:long;
-}
-
-table InodeTimestamps {
-  ctime_in_nanoseconds:long;
-  mtime_in_nanoseconds:long;
-  atime_in_nanoseconds:long;
+table Inode {
+  type:InodeType;
 }

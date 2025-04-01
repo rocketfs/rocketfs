@@ -31,8 +31,8 @@ class FuseOpsProxy {
   void Init(void* userdata, struct fuse_conn_info* conn);
   void Destroy(void* userdata);
 
-  template <typename Operation, typename... Args>
-  Operation* CreateOperation(Args&&... args);
+  template <typename Op, typename... Args>
+  Op* CreateOp(Args&&... args);
 
  private:
   void AsyncCompleteRpc();
@@ -46,12 +46,12 @@ class FuseOpsProxy {
   std::optional<fuse_ino_t> mountpoint_inode_id_;
 };
 
-template <typename Operation, typename... Args>
-Operation* FuseOpsProxy::CreateOperation(Args&&... args) {
-  auto operation = new Operation(fuse_options_,
-                                 std::forward<Args>(args)...,
-                                 namenode_stub_.get(),
-                                 &namenode_cq_);
+template <typename Op, typename... Args>
+Op* FuseOpsProxy::CreateOp(Args&&... args) {
+  auto operation = new Op(fuse_options_,
+                          std::forward<Args>(args)...,
+                          namenode_stub_.get(),
+                          &namenode_cq_);
   operation->Start();
   return operation;
 }

@@ -11,65 +11,73 @@ message PongResponse {
 
 // https://pubs.opengroup.org/onlinepubs/7908799/xsh/sysstat.h.html
 message Stat {
-  uint64 inode_id = 1;
+  uint64 id = 1;
   uint64 mode = 2;
   int32 nlink = 3;
   uint64 uid = 4;
   uint64 gid = 5;
   int64 size = 6;
-  int64 atime = 7;
-  int64 mtime = 8;
-  int64 ctime = 9;
+  int64 atime_in_ns = 7;
+  int64 mtime_in_ns = 8;
+  int64 ctime_in_ns = 9;
   int64 block_size = 10;
   int64 block_num = 11;
 }
 message GetInodeRequest {
   optional string path = 1;
-  optional int64 inode_id = 2;
+  optional uint64 id = 2;
 }
 message GetInodeResponse {
   int32 error_code = 1;
   string error_msg = 2;
-  int64 inode_id = 3;
+  int64 id = 3;
   Stat stat = 4;
 }
 
 message LookupRequest {
-  uint64 parent_inode_id = 1;
+  uint64 parent_id = 1;
   string name = 2;
 }
 message LookupResponse {
   int32 error_code = 1;
   string error_msg = 2;
-  int64 inode_id = 3;
+  int64 id = 3;
   Stat stat = 4;
 }
 
 message ListDirRequest {
-  uint64 inode_id = 1;
+  uint64 id = 1;
   string start_after = 2;
-  int32 max_key = 3;
+  int32 limit = 3;
+  uint32 uid = 4;
+  uint32 gid = 5;
 }
 message ListDirResponse {
-  message DirEntry {
-    uint64 inode_id = 1;
+  message DEnt {
+    uint64 id = 1;
     string name = 2;
-    uint64 mode = 3;
+    uint32 type = 3;
   }
   int32 error_code = 1;
   string error_msg = 2;
-  DirEntry self_entry = 3;
-  DirEntry parent_entry = 4;
-  repeated DirEntry entries = 5;
+  DEnt self_dent = 3;
+  optional DEnt parent_dent = 4;
+  repeated DEnt ents = 5;
   bool has_more = 6;
 }
 
 message MkdirsRequest {
-  string src = 1;
-  bool create_missing_parent = 2;
+  uint64 parent_id = 1;
+  string name = 2;
+  uint64 mode = 3;
+  uint32 uid = 4;
+  uint32 gid = 5;
 }
 message MkdirsResponse {
-  bool result = 1;
+  int32 error_code = 1;
+  string error_msg = 2;
+  uint64 id = 3;
+  Stat stat = 4;
 }
 
 // https://github.com/apache/hadoop/blob/266dad1617d599f7d247b54d03b4741f85cd6460/hadoop-hdfs-project/hadoop-hdfs-client/src/main/proto/ClientNamenodeProtocol.proto#

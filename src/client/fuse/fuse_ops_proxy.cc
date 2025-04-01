@@ -32,13 +32,12 @@ void FuseOpsProxy::Init(void* /*userdata*/, struct fuse_conn_info* /*conn*/) {
       std::make_unique<std::thread>([this]() { this->AsyncCompleteRpc(); });
 
   grpc::ClientContext client_context;
-  GetInodeRequest request;
-  request.set_path(fuse_options_.remote_mountpoint);
-  GetInodeResponse response;
-  grpc::Status status =
-      namenode_stub_->GetInode(&client_context, request, &response);
+  GetInodeRequest req;
+  req.set_path(fuse_options_.remote_mountpoint);
+  GetInodeResponse resp;
+  grpc::Status status = namenode_stub_->GetInode(&client_context, req, &resp);
   CHECK(status.ok());
-  mountpoint_inode_id_ = response.inode_id();
+  mountpoint_inode_id_ = resp.id();
 }
 
 void FuseOpsProxy::Destroy(void* /*userdata*/) {
