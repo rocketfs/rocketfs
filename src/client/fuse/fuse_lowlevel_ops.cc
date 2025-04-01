@@ -10,11 +10,12 @@
 #include <memory>
 
 #include "client/fuse/fuse_ops_proxy.h"
-#include "client/fuse/operation/fuse_get_attr_operation.h"
-#include "client/fuse/operation/fuse_lookup_operation.h"
-#include "client/fuse/operation/fuse_open_dir_operation.h"
-#include "client/fuse/operation/fuse_read_dir_operation.h"
-#include "client/fuse/operation/fuse_release_dir_operation.h"
+#include "client/fuse/operation/fuse_get_attr_op.h"
+#include "client/fuse/operation/fuse_lookup_op.h"
+#include "client/fuse/operation/fuse_mkdir_op.h"
+#include "client/fuse/operation/fuse_open_dir_op.h"
+#include "client/fuse/operation/fuse_read_dir_op.h"
+#include "client/fuse/operation/fuse_rel_dir_op.h"
 
 namespace rocketfs {
 
@@ -27,16 +28,21 @@ const struct fuse_lowlevel_ops gFuseLowlevelOps = {
 
     .lookup =
         [](fuse_req_t req, fuse_ino_t parent, const char* name) {
-          gFuseOpsProxy->CreateOperation<FuseLookupOperation>(
-              req, parent, name);
+          gFuseOpsProxy->CreateOp<FuseLookupOp>(req, parent, name);
         },
     .getattr =
         [](fuse_req_t req, fuse_ino_t ino, struct fuse_file_info* fi) {
-          gFuseOpsProxy->CreateOperation<FuseGetAttrOperation>(req, ino, fi);
+          gFuseOpsProxy->CreateOp<FuseGetAttrOp>(req, ino, fi);
         },
+
+    .mkdir =
+        [](fuse_req_t req, fuse_ino_t parent, const char* name, mode_t mode) {
+          gFuseOpsProxy->CreateOp<FuseMkdirOp>(req, parent, name, mode);
+        },
+
     .opendir =
         [](fuse_req_t req, fuse_ino_t ino, struct fuse_file_info* fi) {
-          gFuseOpsProxy->CreateOperation<FuseOpenDirOperation>(req, ino, fi);
+          gFuseOpsProxy->CreateOp<FuseOpenDirOp>(req, ino, fi);
         },
     .readdir =
         [](fuse_req_t req,
@@ -44,12 +50,11 @@ const struct fuse_lowlevel_ops gFuseLowlevelOps = {
            size_t size,
            off_t off,
            struct fuse_file_info* fi) {
-          gFuseOpsProxy->CreateOperation<FuseReadDirOperation>(
-              req, ino, size, off, fi);
+          gFuseOpsProxy->CreateOp<FuseReadDirOp>(req, ino, size, off, fi);
         },
     .releasedir =
         [](fuse_req_t req, fuse_ino_t ino, struct fuse_file_info* fi) {
-          gFuseOpsProxy->CreateOperation<FuseReleaseDirOperation>(req, ino, fi);
+          gFuseOpsProxy->CreateOp<FuseRelDirOp>(req, ino, fi);
         },
 };
 

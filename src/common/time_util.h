@@ -6,9 +6,10 @@
 
 namespace rocketfs {
 
-constexpr int64_t kSecondToMillisecond = 1000;
-constexpr int64_t kMillisecondToMicrosecond = 1000;
-constexpr int64_t kMicrosecondToNanosecond = 1000;
+constexpr int64_t kSecToMs = 1000;
+constexpr int64_t kMsToUs = 1000;
+constexpr int64_t kUsToNs = 1000;
+constexpr int64_t kSecToNs = kSecToMs * kMsToUs * kUsToNs;
 
 class TimeUtilBase {
  public:
@@ -19,7 +20,7 @@ class TimeUtilBase {
   TimeUtilBase& operator=(TimeUtilBase&&) = delete;
   virtual ~TimeUtilBase() = default;
 
-  virtual int64_t GetCurrentTimeInNanoseconds() const = 0;
+  virtual int64_t NowNs() const = 0;
 };
 
 class TimeUtil : public TimeUtilBase {
@@ -31,7 +32,7 @@ class TimeUtil : public TimeUtilBase {
   TimeUtil& operator=(TimeUtil&&) = delete;
   ~TimeUtil() override = default;
 
-  int64_t GetCurrentTimeInNanoseconds() const override;
+  int64_t NowNs() const override;
 };
 
 }  // namespace rocketfs

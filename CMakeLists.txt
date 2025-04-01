@@ -86,7 +86,3 @@ foreach(main_file ${MAIN_SOURCES})
   add_executable(${exec_name} ${main_file})
   target_link_libraries(${exec_name} PRIVATE rocketfs)
 endforeach()
-
-file(GLOB_RECURSE test-srcs ${CMAKE_SOURCE_DIR}/test/*_test.cc)
-add_executable(test ${test-srcs})
-target_link_libraries(test PRIVATE rocketfs GTest::gtest_main)

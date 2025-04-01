@@ -7,7 +7,7 @@
 
 namespace rocketfs {
 
-int64_t TimeUtil::GetCurrentTimeInNanoseconds() const {
+int64_t TimeUtil::NowNs() const {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
              std::chrono::system_clock::now().time_since_epoch())
       .count();

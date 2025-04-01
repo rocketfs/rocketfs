@@ -27,39 +27,36 @@
 #include <unifex/with_query_value.hpp>
 
 #include "common/logger.h"
-#include "namenode/namenode_context.h"
-#include "namenode/service/operation/get_inode_operation.h"
-#include "namenode/service/operation/list_dir_operation.h"
-#include "namenode/service/operation/lookup_operation.h"
-#include "namenode/service/operation/mkdirs_operation.h"
-#include "namenode/service/operation/ping_pong_operation.h"
+#include "namenode/namenode_ctx.h"
+#include "namenode/service/operation/get_inode_op.h"
+#include "namenode/service/operation/list_dir_op.h"
+#include "namenode/service/operation/lookup_op.h"
+#include "namenode/service/operation/mkdirs_op.h"
+#include "namenode/service/operation/ping_pong_op.h"
 #include "src/proto/client_namenode.grpc.pb.h"
 
 namespace rocketfs {
 
 template <typename Sender>
-void RunGrpcContextForSender(agrpc::GrpcContext* grpc_context,
-                             Sender&& sender) {
-  CHECK_NOTNULL(grpc_context);
-  grpc_context->work_started();
+void RunGrpcCtxForSender(agrpc::GrpcContext* grpc_ctx, Sender&& sender) {
+  CHECK_NOTNULL(grpc_ctx);
+  grpc_ctx->work_started();
   unifex::sync_wait(unifex::when_all(
-      unifex::finally(std::forward<Sender>(sender), unifex::just_from([&] {
-                        grpc_context->work_finished();
-                      })),
-      unifex::just_from([&] { grpc_context->run(); })));
+      unifex::finally(std::forward<Sender>(sender),
+                      unifex::just_from([&] { grpc_ctx->work_finished(); })),
+      unifex::just_from([&] { grpc_ctx->run(); })));
 }
 
 template <typename Rpc, typename Operation>
-auto RegisterRpcHandler(agrpc::GrpcContext* grpc_context,
+auto RegisterRpcHandler(agrpc::GrpcContext* grpc_ctx,
                         ClientNamenodeService::AsyncService* service,
-                        NameNodeContext* namenode_context) {
+                        NameNodeCtx* namenode_ctx) {
   return agrpc::register_sender_rpc_handler<Rpc>(
-      *grpc_context,
+      *grpc_ctx,
       *service,
-      [namenode_context](Rpc& rpc,
-                         const Rpc::Request& request) -> unifex::task<void> {
-        auto response = co_await Operation(namenode_context, request).Run();
-        co_await rpc.finish(response, grpc::Status::OK);
+      [namenode_ctx](Rpc& rpc, const Rpc::Request& req) -> unifex::task<void> {
+        auto resp = co_await Operation(namenode_ctx, req).Run();
+        co_await rpc.finish(resp, grpc::Status::OK);
       });
 }
 
@@ -69,39 +66,38 @@ int main(int argc, const char** argv) {
   const auto port = argc >= 2 ? argv[1] : "50051";
   const auto host = std::string("0.0.0.0:") + port;
 
-  auto namenode_context = std::make_unique<rocketfs::NameNodeContext>();
-  namenode_context->Start();
+  auto namenode_ctx = std::make_unique<rocketfs::NameNodeCtx>();
+  namenode_ctx->Start();
 
   rocketfs::ClientNamenodeService::AsyncService service;
   std::unique_ptr<grpc::Server> server;
 
   grpc::ServerBuilder builder;
-  agrpc::GrpcContext grpc_context{builder.AddCompletionQueue()};
+  agrpc::GrpcContext grpc_ctx{builder.AddCompletionQueue()};
   builder.AddListeningPort(host, grpc::InsecureServerCredentials());
   builder.RegisterService(&service);
   server = builder.BuildAndStart();
 
-  rocketfs::RunGrpcContextForSender(
-      &grpc_context,
+  rocketfs::RunGrpcCtxForSender(
+      &grpc_ctx,
       unifex::with_query_value(
-          unifex::when_all(
-              rocketfs::RegisterRpcHandler<rocketfs::PingPongRPC,
-                                           rocketfs::PingPongOperation>(
-                  &grpc_context, &service, namenode_context.get()),
-              rocketfs::RegisterRpcHandler<rocketfs::GetInodeRPC,
-                                           rocketfs::GetInodeOperation>(
-                  &grpc_context, &service, namenode_context.get()),
-              rocketfs::RegisterRpcHandler<rocketfs::LookupRPC,
-                                           rocketfs::LookupOperation>(
-                  &grpc_context, &service, namenode_context.get()),
-              rocketfs::RegisterRpcHandler<rocketfs::ListDirRPC,
-                                           rocketfs::ListDirOperation>(
-                  &grpc_context, &service, namenode_context.get()),
-              rocketfs::RegisterRpcHandler<rocketfs::MkdirsRPC,
-                                           rocketfs::MkdirsOperation>(
-                  &grpc_context, &service, namenode_context.get())),
+          unifex::when_all(rocketfs::RegisterRpcHandler<rocketfs::PingPongRPC,
+                                                        rocketfs::PingPongOp>(
+                               &grpc_ctx, &service, namenode_ctx.get()),
+                           rocketfs::RegisterRpcHandler<rocketfs::GetInodeRPC,
+                                                        rocketfs::GetInodeOp>(
+                               &grpc_ctx, &service, namenode_ctx.get()),
+                           rocketfs::RegisterRpcHandler<rocketfs::LookupRPC,
+                                                        rocketfs::LookupOp>(
+                               &grpc_ctx, &service, namenode_ctx.get()),
+                           rocketfs::RegisterRpcHandler<rocketfs::ListDirRPC,
+                                                        rocketfs::ListDirOp>(
+                               &grpc_ctx, &service, namenode_ctx.get()),
+                           rocketfs::RegisterRpcHandler<rocketfs::MkdirsRPC,
+                                                        rocketfs::MkdirsOp>(
+                               &grpc_ctx, &service, namenode_ctx.get())),
           unifex::get_scheduler,
           unifex::inline_scheduler{}));
-  namenode_context->Stop();
+  namenode_ctx->Stop();
   return 0;
 }

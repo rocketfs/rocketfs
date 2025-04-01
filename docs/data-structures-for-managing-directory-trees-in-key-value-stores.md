@@ -125,46 +125,46 @@ In conclusion, to model a directory tree that properly supports hard links while
 
 ```sql
 CREATE TABLE DirTable (
-  parent_inode_id INTEGER NOT NULL,
+  parent_id INTEGER NOT NULL,
   name VARCHAR(255) NOT NULL,
-  -- The inode_id serves as a candidate key.
-  inode_id INTEGER NOT NULL,
+  -- The id serves as a candidate key.
+  id INTEGER NOT NULL,
   attr TEXT NOT NULL,
-  PRIMARY KEY (inode_id),
-  -- The combination of (parent_inode_id, name) also serves as a candidate key.
-  UNIQUE (parent_inode_id, name),
-  INDEX (parent_inode_id, name),
-  FOREIGN KEY (parent_inode_id) REFERENCES DirTable(inode_id)
+  PRIMARY KEY (id),
+  -- The combination of (parent_id, name) also serves as a candidate key.
+  UNIQUE (parent_id, name),
+  INDEX (parent_id, name),
+  FOREIGN KEY (parent_id) REFERENCES DirTable(id)
 );
 
 CREATE TABLE FileTable (
-  inode_id INTEGER NOT NULL,
+  id INTEGER NOT NULL,
   attr TEXT NOT NULL,
-  PRIMARY KEY (inode_id)
+  PRIMARY KEY (id)
 );
 
 CREATE TABLE HardLinkTable (
-  parent_inode_id INTEGER NOT NULL,
+  parent_id INTEGER NOT NULL,
   name VARCHAR(255) NOT NULL,
-  inode_id INTEGER NOT NULL,
-  PRIMARY KEY (parent_inode_id, name),
-  FOREIGN KEY (parent_inode_id, name) REFERENCES DirTable(parent_inode_id, name),
-  FOREIGN KEY (inode_id) REFERENCES FileTable(inode_id)
+  id INTEGER NOT NULL,
+  PRIMARY KEY (parent_id, name),
+  FOREIGN KEY (parent_id, name) REFERENCES DirTable(parent_id, name),
+  FOREIGN KEY (id) REFERENCES FileTable(id)
 );
 
--- The combination of (parent_inode_id, name) serves as a primary key.
+-- The combination of (parent_id, name) serves as a primary key.
 CREATE VIEW DirEntryView AS
 SELECT
-  parent_inode_id,
+  parent_id,
   name,
-  inode_id
+  id
 FROM
   DirTable
 UNION ALL
 SELECT
-  parent_inode_id,
+  parent_id,
   name,
-  inode_id
+  id
 FROM
   HardLinkTable
 ```
@@ -176,14 +176,14 @@ A column family in a KV database is analogous to a table in an SQL database. For
 When transitioning from an SQL-based engine to a KV engine to represent a directory tree structure, there are fundamental differences between the two systems that influence the design. Below, we outline these differences and the resulting design decisions for the KV-based implementation.
 
 - KV engines only support keys as the primary index and do not provide secondary indexes. As a result:
-  - We need to create a `DirIndexColumnFamily` (key = `parent_inode_id` + `name`, value = `inode_id`) to serve as a secondary index.
-  - This results in two lookup operations when querying a directory by `parent_inode_id` and `name`:
-    - One lookup would involve querying `DirIndexColumnFamily` with `parent_inode_id` + `name` to retrieve the `inode_id`.
-    - A second lookup would involve querying `DirColumnFamily` with the retrieved `inode_id` to fetch the directory details.
+  - We need to create a `DirIndexColumnFamily` (key = `parent_id` + `name`, value = `id`) to serve as a secondary index.
+  - This results in two lookup operations when querying a directory by `parent_id` and `name`:
+    - One lookup would involve querying `DirIndexColumnFamily` with `parent_id` + `name` to retrieve the `id`.
+    - A second lookup would involve querying `DirColumnFamily` with the retrieved `id` to fetch the directory details.
     - To avoid this inefficiency, we redundantly store the complete directory fields in both `DirColumnFamily` and `DirIndexColumnFamily`. Prioritize efficiency by sacrificing normalization and introducing redundancy.
 - KV engines store values as binary arrays and do not enforce a strong schema or data types.
-  - Since `DirColumnFamily` and `FileColumnFamily` have the same key format (key = `inode_id`), they can be combined into a single column family, `InodeColumnFamily`.
-  - Similarly, since `DirIndexColumnFamily` and `HardLinkColumnFamily` share the same key format (key = `parent_inode_id` + `name`), they can be combined into a single column family, `DirEntryColumnFamily`. Instead of expressing directory entries as a "view" (as in SQL), they are represented as a real column family in the KV engine.
+  - Since `DirColumnFamily` and `FileColumnFamily` have the same key format (key = `id`), they can be combined into a single column family, `InodeColumnFamily`.
+  - Similarly, since `DirIndexColumnFamily` and `HardLinkColumnFamily` share the same key format (key = `parent_id` + `name`), they can be combined into a single column family, `DirEntryColumnFamily`. Instead of expressing directory entries as a "view" (as in SQL), they are represented as a real column family in the KV engine.
 
 Consider the following example:
 
@@ -198,22 +198,22 @@ root (inode 1)
 
 The `InodeColumnFamily` would be structured as follows:
 
-| Key (Inode ID) | Value                                                   |
-| -------------- | ------------------------------------------------------- |
-| 1              | `{type:dir,parent_inode_id:1,name:,inode_id:1,attr:w}`  |
-| 2              | `{type:dir,parent_inode_id:1,name:a,inode_id:2,attr:x}` |
-| 3              | `{type:file,attr:y}`                                    |
-| 4              | `{type:file,attr:z}`                                    |
+| Key (Inode ID) | Value                                       |
+| -------------- | ------------------------------------------- |
+| 1              | `{type:dir,parent_id:1,name:,id:1,attr:w}`  |
+| 2              | `{type:dir,parent_id:1,name:a,id:2,attr:x}` |
+| 3              | `{type:file,attr:y}`                        |
+| 4              | `{type:file,attr:z}`                        |
 
 The `DirEntryColumnFamily` would be structured as follows:
 
-| Key (Parent Inode ID, Name) | Value                                                   |
-| --------------------------- | ------------------------------------------------------- |
-| 1,a                         | `{type:dir,parent_inode_id:1,name:a,inode_id:2,attr:x}` |
-| 2,b                         | `{inode_id:3}`                                          |
-| 2,c                         | `{inode_id:3}`                                          |
-| 2,d                         | `{inode_id:3}`                                          |
-| 2,e                         | `{inode_id:4}`                                          |
+| Key (Parent Inode ID, Name) | Value                                       |
+| --------------------------- | ------------------------------------------- |
+| 1,a                         | `{type:dir,parent_id:1,name:a,id:2,attr:x}` |
+| 2,b                         | `{id:3}`                                    |
+| 2,c                         | `{id:3}`                                    |
+| 2,d                         | `{id:3}`                                    |
+| 2,e                         | `{id:4}`                                    |
 
 ## Reference
 

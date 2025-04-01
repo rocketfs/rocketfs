@@ -45,6 +45,7 @@ T CheckNotNull(
 #define CHECK_NULL(ptr) CHECK((ptr) == nullptr)
 #define CHECK_NOTNULL(ptr) rocketfs::CheckNotNull((ptr), #ptr " != nullptr")
 #define CHECK_NULLOPT(opt) CHECK((opt) == std::nullopt)
+#define CHECK_NOTNULLOPT(opt) CHECK((opt) != std::nullopt)
 #define CHECK_NE(lhs, rhs) CHECK((lhs) != (rhs))
 #define CHECK_EQ(lhs, rhs) CHECK((lhs) == (rhs))
 #define CHECK_LT(lhs, rhs) CHECK((lhs) < (rhs))
