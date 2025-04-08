@@ -17,6 +17,7 @@
 #include "namenode/table/dir_table_base.h"
 #include "namenode/table/hard_link_table_base.h"
 #include "namenode/table/kv/kv_store_base.h"
+#include "namenode/table/kv/serde.h"
 
 namespace rocketfs {
 
@@ -32,7 +33,6 @@ class KVDEntView : public DEntViewBase {
   unifex::task<
       std::expected<std::variant<std::monostate, Dir, HardLink>, Status>>
   Read(InodeID parent_id, std::string_view name) override;
-
   unifex::task<
       std::expected<std::pmr::vector<std::variant<Dir, HardLink>>, Status>>
   List(InodeID parent_id, std::string_view start_after, size_t limit) override;
@@ -40,6 +40,7 @@ class KVDEntView : public DEntViewBase {
  private:
   TxnBase* txn_;
   ReqScopedAlloc alloc_;
+  DEntSerde dent_serde_;
 };
 
 }  // namespace rocketfs

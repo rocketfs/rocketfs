@@ -1,6 +1,6 @@
 // Copyright 2025 RocketFS
 
-#include "namenode/service/operation/get_inode_op.h"
+#include "namenode/service/op/get_inode_op.h"
 
 #include <fmt/base.h>
 #include <quill/LogMacros.h>
@@ -25,7 +25,7 @@ namespace rocketfs {
 
 GetInodeOp::GetInodeOp(NameNodeCtx* namenode_ctx,
                        const GetInodeRPC::Request& req)
-    : OpBase<GetInodeRPC>(CHECK_NOTNULL(namenode_ctx)), req_(req) {
+    : OpBase(CHECK_NOTNULL(namenode_ctx)), req_(req) {
 }
 
 unifex::task<GetInodeRPC::Response> GetInodeOp::Run() {
@@ -33,7 +33,7 @@ unifex::task<GetInodeRPC::Response> GetInodeOp::Run() {
   auto dir = co_await handler_ctx_.GetDirTable()->Read(id);
   if (!dir) {
     auto status = Status::SystemError(
-        fmt::format("Failed to retrieve inode {}.", id.val), dir.error());
+        fmt::format("Failed to get inode {}.", id.val), dir.error());
     LOG_ERROR(logger, "{}", status.GetMsg());
     co_return status.MakeError<GetInodeRPC::Response>();
   }

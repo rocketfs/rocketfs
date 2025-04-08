@@ -1,7 +1,8 @@
 // Copyright 2025 RocketFS
 
-#include "namenode/service/operation/mkdirs_op.h"
+#include "namenode/service/op/mkdirs_op.h"
 
+#include <fmt/base.h>
 #include <quill/LogMacros.h>
 #include <quill/core/ThreadContextManager.h>
 #include <sys/stat.h>
@@ -12,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 
 #include <unifex/coroutine.hpp>
 
@@ -19,6 +21,8 @@
 #include "common/status.h"
 #include "common/time_util.h"
 #include "namenode/service/handler_ctx.h"
+#include "namenode/service/op/op_base.h"
+#include "namenode/table/dent_view_base.h"
 #include "namenode/table/dir_table_base.h"
 #include "namenode/table/inode_id.h"
 #include "namenode/table/kv/kv_store_base.h"
@@ -26,31 +30,52 @@
 namespace rocketfs {
 
 MkdirsOp::MkdirsOp(NameNodeCtx* namenode_ctx, const MkdirsRPC::Request& req)
-    : handler_ctx_(CHECK_NOTNULL(namenode_ctx)), req_(req) {
+    : OpBase(CHECK_NOTNULL(namenode_ctx)), req_(req) {
 }
 
 unifex::task<MkdirsRPC::Response> MkdirsOp::Run() {
   auto parent_id = InodeID{req_.parent_id()};
   auto parent_dir = co_await handler_ctx_.GetDirTable()->Read(parent_id);
   if (!parent_dir) {
-    LOG_ERROR(logger,
-              "Unable to retrieve parent directory for inode {}: {}.",
-              parent_id.val,
-              parent_dir.error().GetMsg());
-    MkdirsRPC::Response resp;
-    resp.set_error_code(static_cast<int>(StatusCode::kSystemError));
-    co_return resp;
+    auto status = Status::SystemError(
+        fmt::format("Failed to get parent dir for inode {}.", parent_id.val),
+        parent_dir.error());
+    LOG_ERROR(logger, "{}", status.GetMsg());
+    co_return status.MakeError<MkdirsRPC::Response>();
   }
   if (!*parent_dir) {
-    MkdirsRPC::Response resp;
-    resp.set_error_code(static_cast<int>(StatusCode::kParentNotFoundError));
-    co_return resp;
+    auto status = Status::ParentNotFoundError(
+        fmt::format("Parent dir {} not found.", parent_id.val));
+    LOG_DEBUG(logger, "{}", status.GetMsg());
+    co_return status.MakeError<MkdirsRPC::Response>();
   }
-  if (!CheckPermission(
-          (*parent_dir)->acl, User{req_.uid(), req_.gid()}, S_IWOTH)) {
-    MkdirsRPC::Response resp;
-    resp.set_error_code(static_cast<int>(StatusCode::kPermissionError));
-    co_return resp;
+  auto has_permission = CheckPermission(
+      (*parent_dir)->acl, User{req_.uid(), req_.gid()}, S_IWOTH);
+  if (!has_permission) {
+    auto status = Status::PermissionError(
+        fmt::format("Permission denied on parent inode {}.", parent_id.val),
+        has_permission.error());
+    LOG_DEBUG(logger, "{}", status.GetMsg());
+    co_return status.MakeError<MkdirsRPC::Response>();
+  }
+
+  auto dent = co_await handler_ctx_.GetDEntView()->Read(parent_id, req_.name());
+  if (!dent) {
+    auto status = Status::SystemError(
+        fmt::format("Failed to verify if the dir entry with parent ID {} and "
+                    "name {} exists.",
+                    parent_id.val,
+                    req_.name()));
+    LOG_ERROR(logger, "{}", status.GetMsg());
+    co_return status.MakeError<MkdirsRPC::Response>();
+  }
+  if (!std::holds_alternative<std::monostate>(*dent)) {
+    auto status = Status::AlreadyExistsError(
+        fmt::format("Dir entry with parent ID {} and name {} already exists.",
+                    parent_id.val,
+                    req_.name()));
+    LOG_DEBUG(logger, "{}", status.GetMsg());
+    co_return status.MakeError<MkdirsRPC::Response>();
   }
 
   auto id = handler_ctx_.GetCtx()->GetInodeIDGen().Next();

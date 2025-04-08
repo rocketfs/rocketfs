@@ -8,9 +8,15 @@
 #include <optional>
 #include <string>
 
+#include <unifex/task.hpp>
+
 #include "common/status.h"
 #include "generated/inode_generated.h"
 #include "namenode/common/id_gen.h"
+#include "namenode/common/req_scoped_alloc.h"
+#include "namenode/table/file_table_base.h"
+#include "namenode/table/inode_id.h"
+#include "namenode/table/kv/kv_store_base.h"
 
 namespace rocketfs {
 
@@ -37,10 +43,10 @@ class HardLinkTableBase {
   HardLinkTableBase& operator=(HardLinkTableBase&&) = delete;
   virtual ~HardLinkTableBase() = default;
 
-  virtual std::expected<std::optional<HardLink>, Status> Read(
+  virtual unifex::task<std::expected<std::optional<HardLink>, Status>> Read(
       InodeID parent_id, std::string_view name) = 0;
-  virtual void Write(const std::optional<HardLink>& original,
-                     const std::optional<HardLink>& modified) = 0;
+  virtual void Write(const std::optional<HardLink>& orig,
+                     const std::optional<HardLink>& mod) = 0;
 };
 
 }  // namespace rocketfs

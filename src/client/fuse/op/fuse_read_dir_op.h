@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "client/fuse/fuse_options.h"
-#include "client/fuse/operation/fuse_async_op_base.h"
+#include "client/fuse/op/fuse_async_op_base.h"
 #include "common/status.h"
 #include "src/proto/client_namenode.grpc.pb.h"
 #include "src/proto/client_namenode.pb.h"

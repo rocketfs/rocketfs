@@ -1,6 +1,6 @@
 // Copyright 2025 RocketFS
 
-#include "client/fuse/operation/fuse_read_dir_op.h"
+#include "client/fuse/op/fuse_read_dir_op.h"
 
 #include <google/protobuf/repeated_ptr_field.h>
 #include <grpcpp/support/async_unary_call.h>
@@ -30,9 +30,6 @@ FuseReadDirOp::FuseReadDirOp(const FuseOptions& fuse_options,
       buf_(buf_holder_) {
   static_assert(sizeof(off) == sizeof(cache_dir_entries_));
   CHECK_EQ(off, cache_dir_entries_->end_off);
-  auto ctx = CHECK_NOTNULL(fuse_req_ctx(fuse_req_));
-  req_.set_uid(ctx->uid);
-  req_.set_gid(ctx->gid);
 }
 
 void FuseReadDirOp::Start() {
@@ -54,7 +51,7 @@ void FuseReadDirOp::PrepareAsyncRpcCall() {
 
 std::optional<int> FuseReadDirOp::ToErrno(StatusCode status_code) {
   // https://man7.org/linux/man-pages/man3/readdir.3.html
-  // | `EBADF` | Invalid directory stream descriptor. |
+  // | `EBADF` | Invalid dir stream descriptor. |
   switch (status_code) {
     default:
       return std::nullopt;
@@ -78,8 +75,8 @@ void FuseReadDirOp::PopulateDirEntriesBuffer() {
     const auto& entry = cache_dir_entries_->entries.at(
         cache_dir_entries_->end_off - cache_dir_entries_->start_off);
     // From the 'stbuf' argument the st_ino field and bits 12-15 (file type,
-    // e.g., regular file, directory) of the st_mode field are used. The other
-    // fields are ignored.
+    // e.g., regular file, dir) of the st_mode field are used. The other fields
+    // are ignored.
     static_assert(S_IFMT == 0XF000);
     struct stat stbuf;
     stbuf.st_ino = entry.id();

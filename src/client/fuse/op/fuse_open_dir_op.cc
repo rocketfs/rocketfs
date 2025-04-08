@@ -1,6 +1,6 @@
 // Copyright 2025 RocketFS
 
-#include "client/fuse/operation/fuse_open_dir_op.h"
+#include "client/fuse/op/fuse_open_dir_op.h"
 
 #include <errno.h>
 #include <google/protobuf/repeated_ptr_field.h>
@@ -10,7 +10,7 @@
 #include <memory>
 #include <vector>
 
-#include "client/fuse/operation/fuse_read_dir_op.h"
+#include "client/fuse/op/fuse_read_dir_op.h"
 #include "common/logger.h"
 
 namespace rocketfs {
@@ -24,9 +24,6 @@ FuseOpenDirOp::FuseOpenDirOp(const FuseOptions& fuse_options,
     : FuseAsyncOpBase(fuse_options, fuse_req, stub, cq),
       file_info_(CHECK_NOTNULL(file_info)) {
   req_.set_id(id);
-  auto ctx = CHECK_NOTNULL(fuse_req_ctx(fuse_req_));
-  req_.set_uid(ctx->uid);
-  req_.set_gid(ctx->gid);
 }
 
 void FuseOpenDirOp::PrepareAsyncRpcCall() {
@@ -38,7 +35,7 @@ std::optional<int> FuseOpenDirOp::ToErrno(StatusCode status_code) {
   // | `EACCES`  | Permission denied.                                    |
   // | `EBADF`   | fd is not a valid file descriptor opened for reading. |
   // | `ENOENT`  | Directory does not exist, or name is an empty string. |
-  // | `ENOTDIR` | name is not a directory.                              |
+  // | `ENOTDIR` | name is not a dir.                                    |
   switch (status_code) {
     case StatusCode::kPermissionError:
       return EACCES;

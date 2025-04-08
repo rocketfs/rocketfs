@@ -10,12 +10,13 @@
 #include <memory>
 
 #include "client/fuse/fuse_ops_proxy.h"
-#include "client/fuse/operation/fuse_get_attr_op.h"
-#include "client/fuse/operation/fuse_lookup_op.h"
-#include "client/fuse/operation/fuse_mkdir_op.h"
-#include "client/fuse/operation/fuse_open_dir_op.h"
-#include "client/fuse/operation/fuse_read_dir_op.h"
-#include "client/fuse/operation/fuse_rel_dir_op.h"
+#include "client/fuse/op/fuse_get_attr_op.h"
+#include "client/fuse/op/fuse_lookup_op.h"
+#include "client/fuse/op/fuse_mkdir_op.h"
+#include "client/fuse/op/fuse_mknod_op.h"
+#include "client/fuse/op/fuse_open_dir_op.h"
+#include "client/fuse/op/fuse_read_dir_op.h"
+#include "client/fuse/op/fuse_rel_dir_op.h"
 
 namespace rocketfs {
 
@@ -35,6 +36,14 @@ const struct fuse_lowlevel_ops gFuseLowlevelOps = {
           gFuseOpsProxy->CreateOp<FuseGetAttrOp>(req, ino, fi);
         },
 
+    .mknod =
+        [](fuse_req_t req,
+           fuse_ino_t parent,
+           const char* name,
+           mode_t mode,
+           dev_t rdev) {
+          gFuseOpsProxy->CreateOp<FuseMknodOp>(req, parent, name, mode, rdev);
+        },
     .mkdir =
         [](fuse_req_t req, fuse_ino_t parent, const char* name, mode_t mode) {
           gFuseOpsProxy->CreateOp<FuseMkdirOp>(req, parent, name, mode);

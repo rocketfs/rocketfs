@@ -27,18 +27,17 @@ namespace rocketfs {
 // 2. Permissions
 //    Each class has three types of permissions: read, write, and execute.
 //    - For regular files: Permissions are straightforward.
-//    - For directories: Permissions are often misunderstood:
-//      - The read perm allows listing the names of files in the directory
-//        but does not provide further information, such as file contents, file
-//        type, size, ownership, or permissions.
-//      - The write perm allows modifying entries in the directory, such
-//        as creating, deleting, or renaming files. However, this requires the
-//        execute perm to be set; without it, the write perm is
-//        meaningless for directories.
-//      - The execute perm is interpreted as the "search" perm for
-//        directories. It grants access to file contents and meta-information if
-//        the file name is known. However, it does not allow listing files
-//        inside the directory unless the read perm is also set.
+//    - For dirs: Permissions are often misunderstood:
+//      - The read perm allows listing the names of files in the dir but does
+//        not provide further information, such as file contents, file type,
+//        size, ownership, or permissions.
+//      - The write perm allows modifying entries in the dir, such as creating,
+//        deleting, or renaming files. However, this requires the execute perm
+//        to be set; without it, the write perm is meaningless for dirs.
+//      - The execute perm is interpreted as the "search" perm for dirs. It
+//        grants access to file contents and meta-information if the file name
+//        is known. However, it does not allow listing files inside the dir
+//        unless the read perm is also set.
 // Reference: https://en.wikipedia.org/wiki/File-system_permissions
 struct Acl {
   uint32_t uid;
@@ -117,8 +116,8 @@ class DirTableBase {
       InodeID id) = 0;
   virtual unifex::task<std::expected<std::optional<Dir>, Status>> Read(
       InodeID parent_id, std::string_view name) = 0;
-  virtual void Write(const std::optional<Dir>& original,
-                     const std::optional<Dir>& modified) = 0;
+  virtual void Write(const std::optional<Dir>& orig,
+                     const std::optional<Dir>& mod) = 0;
 };
 
 }  // namespace rocketfs

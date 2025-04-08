@@ -45,11 +45,10 @@ KVDirTable::KVDirTable(TxnBase* txn, ReqScopedAlloc alloc)
 
 unifex::task<std::expected<std::optional<Dir>, Status>> KVDirTable::Read(
     InodeID id) {
-  auto inode_str =
-      co_await txn_->Get(kInodeCFIndex, InodeSerde(alloc_).SerKey(id));
+  auto inode_str = co_await txn_->Get(kInodeCFIndex, inode_serde_.SerKey(id));
   if (!inode_str) {
     co_return std::unexpected(Status::SystemError(
-        fmt::format("Failed to retrieve inode for inode {}.", id.val),
+        fmt::format("Failed to get inode for inode {}.", id.val),
         inode_str.error()));
   }
   if (!*inode_str) {
@@ -65,50 +64,47 @@ unifex::task<std::expected<std::optional<Dir>, Status>> KVDirTable::Read(
     }
     co_return std::nullopt;
   }
-  auto inode = InodeSerde(alloc_).DeVal(**inode_str);
+  auto inode = inode_serde_.DeVal(**inode_str);
   if (!std::holds_alternative<Dir>(inode)) {
     co_return std::nullopt;
   }
   auto dir = std::get<Dir>(std::move(inode));
 
-  auto mtime_str =
-      co_await txn_->Get(kMTimeCFIndex, MTimeSerde(alloc_).SerKey(id));
+  auto mtime_str = co_await txn_->Get(kMTimeCFIndex, mtime_serde_.SerKey(id));
   if (!mtime_str) {
     co_return std::unexpected(Status::SystemError(
-        fmt::format("Failed to retrieve mtime for inode {}.", id.val),
+        fmt::format("Failed to get mtime for inode {}.", id.val),
         mtime_str.error()));
   }
   CHECK_NOTNULLOPT(*mtime_str);
-  dir.mtime_in_ns = MTimeSerde(alloc_).DeVal(**mtime_str);
+  dir.mtime_in_ns = mtime_serde_.DeVal(**mtime_str);
 
-  auto atime_str =
-      co_await txn_->Get(kATimeCFIndex, ATimeSerde(alloc_).SerKey(id));
+  auto atime_str = co_await txn_->Get(kATimeCFIndex, atime_serde_.SerKey(id));
   if (!atime_str) {
     co_return std::unexpected(Status::SystemError(
-        fmt::format("Failed to retrieve atime for inode {}.", id.val),
+        fmt::format("Failed to get atime for inode {}.", id.val),
         atime_str.error()));
   }
   CHECK_NOTNULLOPT(*atime_str);
-  dir.atime_in_ns = ATimeSerde(alloc_).DeVal(**atime_str);
+  dir.atime_in_ns = atime_serde_.DeVal(**atime_str);
   co_return dir;
 }
 
 unifex::task<std::expected<std::optional<Dir>, Status>> KVDirTable::Read(
     InodeID parent_id, std::string_view name) {
-  auto dent_str = co_await txn_->Get(kDEntCFIndex,
-                                     DEntSerde(alloc_).SerKey(parent_id, name));
+  auto dent_str =
+      co_await txn_->Get(kDEntCFIndex, dent_serde_.SerKey(parent_id, name));
   if (!dent_str) {
     co_return std::unexpected(Status::SystemError(
-        fmt::format(
-            "Failed to retrieve dir entry for parent inode {} and name {}.",
-            parent_id.val,
-            name),
+        fmt::format("Failed to get dir entry for parent inode {} and name {}.",
+                    parent_id.val,
+                    name),
         dent_str.error()));
   }
   if (!*dent_str) {
     co_return std::nullopt;
   }
-  auto dent = DEntSerde(alloc_).DeVal(**dent_str);
+  auto dent = dent_serde_.DeVal(**dent_str);
   if (!std::holds_alternative<Dir>(dent)) {
     co_return std::nullopt;
   }

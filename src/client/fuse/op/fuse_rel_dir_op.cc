@@ -1,6 +1,6 @@
 // Copyright 2025 RocketFS
 
-#include "client/fuse/operation/fuse_rel_dir_op.h"
+#include "client/fuse/op/fuse_rel_dir_op.h"
 
 #include "common/logger.h"
 

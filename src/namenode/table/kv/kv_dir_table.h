@@ -29,8 +29,8 @@ class KVDirTable : public DirTableBase {
       InodeID id) override;
   unifex::task<std::expected<std::optional<Dir>, Status>> Read(
       InodeID parent_id, std::string_view name) override;
-  void Write(const std::optional<Dir>& original,
-             const std::optional<Dir>& modified) override;
+  void Write(const std::optional<Dir>& orig,
+             const std::optional<Dir>& mod) override;
 
  private:
   TxnBase* txn_;

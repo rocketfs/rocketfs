@@ -40,7 +40,6 @@ class DEntViewBase {
   virtual unifex::task<
       std::expected<std::variant<std::monostate, Dir, HardLink>, Status>>
   Read(InodeID parent_id, std::string_view name) = 0;
-
   virtual unifex::task<
       std::expected<std::pmr::vector<std::variant<Dir, HardLink>>, Status>>
   List(InodeID parent_id, std::string_view start_after, size_t limit) = 0;

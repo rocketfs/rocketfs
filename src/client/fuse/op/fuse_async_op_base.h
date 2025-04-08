@@ -72,6 +72,13 @@ FuseAsyncOpBase<Stub, Rep, Resp>::FuseAsyncOpBase(
       fuse_req_(CHECK_NOTNULL(fuse_req)),
       stub_(CHECK_NOTNULL(stub)),
       cq_(CHECK_NOTNULL(cq)) {
+  if constexpr (
+      requires { req_.set_uid(uint32_t{}); } &&
+      requires { req_.set_gid(uint32_t{}); }) {
+    auto ctx = CHECK_NOTNULL(fuse_req_ctx(fuse_req_));
+    req_.set_uid(ctx->uid);
+    req_.set_gid(ctx->gid);
+  }
 }
 
 template <typename Stub, typename Rep, typename Resp>

@@ -5,8 +5,8 @@
 #include <grpcpp/completion_queue.h>
 
 #include "client/fuse/fuse_options.h"
-#include "client/fuse/operation/fuse_async_op_base.h"
-#include "client/fuse/operation/fuse_read_dir_op.h"
+#include "client/fuse/op/fuse_async_op_base.h"
+#include "client/fuse/op/fuse_read_dir_op.h"
 #include "src/proto/client_namenode.grpc.pb.h"
 
 namespace rocketfs {

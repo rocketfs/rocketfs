@@ -1,6 +1,6 @@
 // Copyright 2025 RocketFS
 
-#include "client/fuse/operation/fuse_lookup_op.h"
+#include "client/fuse/op/fuse_lookup_op.h"
 
 #include <errno.h>
 #include <grpcpp/support/async_unary_call.h>

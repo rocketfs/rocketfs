@@ -25,19 +25,18 @@
 namespace rocketfs {
 
 KVDEntView::KVDEntView(TxnBase* txn, ReqScopedAlloc alloc)
-    : txn_(CHECK_NOTNULL(txn)), alloc_(alloc) {
+    : txn_(CHECK_NOTNULL(txn)), alloc_(alloc), dent_serde_(alloc_) {
 }
 
 unifex::task<std::expected<std::variant<std::monostate, Dir, HardLink>, Status>>
 KVDEntView::Read(InodeID parent_id, std::string_view name) {
-  auto dent_str = co_await txn_->Get(kDEntCFIndex,
-                                     DEntSerde(alloc_).SerKey(parent_id, name));
+  auto dent_str =
+      co_await txn_->Get(kDEntCFIndex, dent_serde_.SerKey(parent_id, name));
   if (!dent_str) {
     co_return std::unexpected(Status::SystemError(
-        fmt::format(
-            "Failed to retrieve dir entry for parent inode {} and name {}.",
-            parent_id.val,
-            name),
+        fmt::format("Failed to get dir entry for parent inode {} and name {}.",
+                    parent_id.val,
+                    name),
         dent_str.error()));
   }
   if (!*dent_str) {
@@ -47,7 +46,7 @@ KVDEntView::Read(InodeID parent_id, std::string_view name) {
       [](auto&& arg) -> std::variant<std::monostate, Dir, HardLink> {
         return std::forward<decltype(arg)>(arg);
       },
-      DEntSerde(alloc_).DeVal(**dent_str));
+      dent_serde_.DeVal(**dent_str));
 }
 
 unifex::task<
@@ -57,21 +56,21 @@ KVDEntView::List(InodeID parent_id,
                  size_t limit) {
   auto dent_strs =
       co_await txn_->GetRange(kDEntCFIndex,
-                              DEntSerde(alloc_).SerKey(parent_id, start_after),
-                              DEntSerde(alloc_).SerKey(parent_id, "\xFF"),
+                              dent_serde_.SerKey(parent_id, start_after),
+                              dent_serde_.SerKey(parent_id, "\xFF"),
                               limit);
   if (!dent_strs) {
-    co_return std::unexpected(
-        Status::SystemError(fmt::format("Failed to retrieve dir entries for "
-                                        "parent inode {} and start after {}.",
-                                        parent_id.val,
-                                        start_after),
-                            dent_strs.error()));
+    co_return std::unexpected(Status::SystemError(
+        fmt::format(
+            "Failed to get dir entries for parent inode {} and start after {}.",
+            parent_id.val,
+            start_after),
+        dent_strs.error()));
   }
   std::pmr::vector<std::variant<Dir, HardLink>> dents(alloc_);
   dents.reserve(dent_strs->size());
   for (const auto& dent_str : *dent_strs) {
-    dents.emplace_back(DEntSerde(alloc_).DeVal(dent_str));
+    dents.emplace_back(dent_serde_.DeVal(dent_str));
   }
   co_return dents;
 }

@@ -1,6 +1,6 @@
 // Copyright 2025 RocketFS
 
-#include "namenode/service/operation/list_dir_op.h"
+#include "namenode/service/op/list_dir_op.h"
 
 #include <fmt/base.h>
 #include <gflags/gflags.h>
@@ -31,7 +31,7 @@ namespace rocketfs {
 DECLARE_uint32(list_dir_default_limit);
 
 ListDirOp::ListDirOp(NameNodeCtx* namenode_ctx, const ListDirRPC::Request& req)
-    : OpBase<ListDirRPC>(CHECK_NOTNULL(namenode_ctx)), req_(req) {
+    : OpBase(CHECK_NOTNULL(namenode_ctx)), req_(req) {
 }
 
 unifex::task<ListDirRPC::Response> ListDirOp::Run() {
@@ -51,7 +51,7 @@ unifex::task<ListDirRPC::Response> ListDirOp::Run() {
     co_return status.MakeError<ListDirRPC::Response>();
   }
   auto has_permission = CheckPermission(
-      (*parent_dir)->acl, User{req_.uid(), req_.gid()}, S_IRUSR);
+      (*parent_dir)->acl, User{req_.uid(), req_.gid()}, S_IROTH);
   if (!has_permission) {
     auto status = Status::PermissionError(
         fmt::format("Permission denied on parent inode {}.", parent_id.val),
@@ -97,8 +97,7 @@ unifex::task<ListDirRPC::Response> ListDirOp::Run() {
       req_.limit() > 0 ? req_.limit() : FLAGS_list_dir_default_limit);
   if (!ents) {
     auto status = Status::SystemError(
-        fmt::format("Unable to list directory {}.", parent_id.val),
-        ents.error());
+        fmt::format("Unable to list dir {}.", parent_id.val), ents.error());
     LOG_ERROR(logger, "{}", status.GetMsg());
     co_return status.MakeError<ListDirRPC::Response>();
   }

@@ -6,7 +6,7 @@
 #include <unifex/task.hpp>
 
 #include "namenode/namenode_ctx.h"
-#include "namenode/service/operation/op_base.h"
+#include "namenode/service/op/op_base.h"
 #include "src/proto/client_namenode.grpc.pb.h"
 #include "src/proto/client_namenode.pb.h"
 

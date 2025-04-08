@@ -28,11 +28,12 @@
 
 #include "common/logger.h"
 #include "namenode/namenode_ctx.h"
-#include "namenode/service/operation/get_inode_op.h"
-#include "namenode/service/operation/list_dir_op.h"
-#include "namenode/service/operation/lookup_op.h"
-#include "namenode/service/operation/mkdirs_op.h"
-#include "namenode/service/operation/ping_pong_op.h"
+#include "namenode/service/op/create_op.h"
+#include "namenode/service/op/get_inode_op.h"
+#include "namenode/service/op/list_dir_op.h"
+#include "namenode/service/op/lookup_op.h"
+#include "namenode/service/op/mkdirs_op.h"
+#include "namenode/service/op/ping_pong_op.h"
 #include "src/proto/client_namenode.grpc.pb.h"
 
 namespace rocketfs {
@@ -92,6 +93,9 @@ int main(int argc, const char** argv) {
                                &grpc_ctx, &service, namenode_ctx.get()),
                            rocketfs::RegisterRpcHandler<rocketfs::ListDirRPC,
                                                         rocketfs::ListDirOp>(
+                               &grpc_ctx, &service, namenode_ctx.get()),
+                           rocketfs::RegisterRpcHandler<rocketfs::CreateRPC,
+                                                        rocketfs::CreateOp>(
                                &grpc_ctx, &service, namenode_ctx.get()),
                            rocketfs::RegisterRpcHandler<rocketfs::MkdirsRPC,
                                                         rocketfs::MkdirsOp>(

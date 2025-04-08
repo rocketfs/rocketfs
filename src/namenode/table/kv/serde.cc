@@ -12,10 +12,12 @@
 #include <cstring>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include "common/logger.h"
 #include "generated/dent_generated.h"
 #include "generated/inode_generated.h"
+#include "namenode/table/hard_link_table_base.h"
 
 namespace rocketfs {
 

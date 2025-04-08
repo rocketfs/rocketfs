@@ -16,10 +16,6 @@
 #include <variant>
 
 #include "namenode/common/req_scoped_alloc.h"
-#include "namenode/table/dir_table_base.h"
-#include "namenode/table/file_table_base.h"
-#include "namenode/table/hard_link_table_base.h"
-#include "namenode/table/inode_id.h"
 
 namespace rocketfs {
 

@@ -37,6 +37,8 @@ message GetInodeResponse {
 message LookupRequest {
   uint64 parent_id = 1;
   string name = 2;
+  uint32 uid = 3;
+  uint32 gid = 4;
 }
 message LookupResponse {
   int32 error_code = 1;
@@ -66,6 +68,20 @@ message ListDirResponse {
   bool has_more = 6;
 }
 
+message CreateRequest {
+  uint64 parent_id = 1;
+  string name = 2;
+  uint64 mode = 3;
+  uint32 uid = 4;
+  uint32 gid = 5;
+}
+message CreateResponse {
+  int32 error_code = 1;
+  string error_msg = 2;
+  uint64 id = 3;
+  Stat stat = 4;
+}
+
 message MkdirsRequest {
   uint64 parent_id = 1;
   string name = 2;
@@ -87,5 +103,6 @@ service ClientNamenodeService {
   rpc GetInode(GetInodeRequest) returns (GetInodeResponse);
   rpc Lookup(LookupRequest) returns (LookupResponse);
   rpc ListDir(ListDirRequest) returns (ListDirResponse);
+  rpc Create(CreateRequest) returns (CreateResponse);
   rpc Mkdirs(MkdirsRequest) returns (MkdirsResponse);
 }

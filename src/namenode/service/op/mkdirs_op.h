@@ -6,7 +6,7 @@
 #include <unifex/task.hpp>
 
 #include "namenode/namenode_ctx.h"
-#include "namenode/service/handler_ctx.h"
+#include "namenode/service/op/op_base.h"
 #include "src/proto/client_namenode.grpc.pb.h"
 #include "src/proto/client_namenode.pb.h"
 
@@ -15,7 +15,7 @@ namespace rocketfs {
 using MkdirsRPC =
     agrpc::ServerRPC<&ClientNamenodeService::AsyncService::RequestMkdirs>;
 
-class MkdirsOp {
+class MkdirsOp : public OpBase<MkdirsRPC> {
  public:
   MkdirsOp(NameNodeCtx* namenode_ctx, const MkdirsRPC::Request& req);
   MkdirsOp(const MkdirsOp&) = delete;
@@ -27,7 +27,6 @@ class MkdirsOp {
   unifex::task<MkdirsRPC::Response> Run();
 
  private:
-  HandlerCtx handler_ctx_;
   const MkdirsRPC::Request& req_;
 };
 

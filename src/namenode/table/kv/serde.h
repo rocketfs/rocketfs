@@ -74,15 +74,7 @@ class Serde {
              TxnBase* txn,
              CFIndex cf_index,
              const std::optional<T>& orig,
-             const std::optional<T>& mod) {
-    auto write_ops = self.GetWriteOps(orig, mod);
-    if (write_ops.del_key) {
-      txn->Del(cf_index, *write_ops.del_key);
-    }
-    if (write_ops.put_kv) {
-      txn->Put(cf_index, write_ops.put_kv->first, write_ops.put_kv->second);
-    }
-  }
+             const std::optional<T>& mod);
 
  private:
   template <typename T>
@@ -91,6 +83,21 @@ class Serde {
                    const std::optional<T>& mod)
       -> WriteOps<decltype(self.SerVal(*mod))>;
 };
+
+template <typename T>
+void Serde::Write(this auto&& self,
+                  TxnBase* txn,
+                  CFIndex cf_index,
+                  const std::optional<T>& orig,
+                  const std::optional<T>& mod) {
+  auto write_ops = self.GetWriteOps(orig, mod);
+  if (write_ops.del_key) {
+    txn->Del(cf_index, *write_ops.del_key);
+  }
+  if (write_ops.put_kv) {
+    txn->Put(cf_index, write_ops.put_kv->first, write_ops.put_kv->second);
+  }
+}
 
 template <typename T>
 auto Serde::GetWriteOps(this auto&& self,
