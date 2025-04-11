@@ -7,17 +7,35 @@ FROM debian:bookworm-20241223
 # Always use `set -eo pipefail`.
 # Fail fast and be aware of exit codes.
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-RUN apt-get update                                          &&\
-  apt-get install -y --no-install-recommends                  \
-  apt-transport-https=2.6.1 ca-certificates=20230311          \
-  gnupg2=2.2.40-1.1                                           \
-  git=1:2.39.5-0+deb12u2 wget=1.21.3-1+deb12u1 unzip=6.0-28   \
-  autoconf=2.71-3 automake=1:1.16.5-1.3                       \
-  build-essential=12.9 libtool=2.4.7-7~deb12u1                \
-  cmake=3.25.1-1 meson=1.0.1-5 make=4.3-4.1                   \
-  python3=3.11.2-1+b1 python3-pip=23.0.1+dfsg-1               \
-  gcc=4:12.2.0-3 g++=4:12.2.0-3 gdb=13.1-3                  &&\
-  apt-get clean                                             &&\
+RUN apt-get update                           &&\
+  apt-get install -y --no-install-recommends   \
+  apt-transport-https=2.6.1                    \
+  autoconf=2.71-3                              \
+  automake=1:1.16.5-1.3                        \
+  build-essential=12.9                         \
+  ca-certificates=20230311                     \
+  cmake=3.25.1-1                               \
+  g++=4:12.2.0-3                               \
+  gcc=4:12.2.0-3                               \
+  gdb=13.1-3                                   \
+  git=1:2.39.5-0+deb12u2                       \
+  gnupg2=2.2.40-1.1                            \
+  libaio-dev=0.3.113-4                         \
+  libcunit1-dev=2.1-3-dfsg-2.6                 \
+  libnuma-dev=2.0.16-1                         \
+  libssl-dev=3.0.15-1~deb12u1                  \
+  libtool=2.4.7-7~deb12u1                      \
+  make=4.3-4.1                                 \
+  meson=1.0.1-5                                \
+  patchelf=0.14.3-1+b1                         \
+  pkg-config=1.8.1-1                           \
+  python3-pip=23.0.1+dfsg-1                    \
+  python3-pyelftools=0.29-1                    \
+  python3=3.11.2-1+b1                          \
+  unzip=6.0-28                                 \
+  uuid-dev=2.38.1-5+deb12u3                    \
+  wget=1.21.3-1+deb12u1                      &&\
+  apt-get clean                              &&\
   rm -rf /var/lib/apt/lists/*
 RUN wget -qO- https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip  |\
   funzip >/usr/bin/ninja                                                                     &&\
@@ -27,24 +45,24 @@ RUN wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key    |\
   tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc              &&\
   apt-get update                                           &&\
   apt-get install -y --no-install-recommends                 \
+  clang-19-doc=1:19.1.4-1~deb12u1                            \
+  clang-19=1:19.1.4-1~deb12u1                                \
+  clang-format-19=1:19.1.4-1~deb12u1                         \
+  clang-tidy-19=1:19.1.4-1~deb12u1                           \
+  clang-tools-19=1:19.1.4-1~deb12u1                          \
+  clangd-19=1:19.1.4-1~deb12u1                               \
+  libclang-19-dev=1:19.1.4-1~deb12u1                         \
+  libclang-common-19-dev=1:19.1.4-1~deb12u1                  \
+  libclang-rt-19-dev=1:19.1.4-1~deb12u1                      \
+  libclang1-19=1:19.1.4-1~deb12u1                            \
   libllvm-19-ocaml-dev=1:19.1.4-1~deb12u1                    \
   libllvm19=1:19.1.4-1~deb12u1                               \
-  llvm-19=1:19.1.4-1~deb12u1                                 \
   llvm-19-dev=1:19.1.4-1~deb12u1                             \
   llvm-19-doc=1:19.1.4-1~deb12u1                             \
   llvm-19-examples=1:19.1.4-1~deb12u1                        \
   llvm-19-runtime=1:19.1.4-1~deb12u1                         \
-  clang-19=1:19.1.4-1~deb12u1                                \
-  clang-tools-19=1:19.1.4-1~deb12u1                          \
-  clang-19-doc=1:19.1.4-1~deb12u1                            \
-  libclang-common-19-dev=1:19.1.4-1~deb12u1                  \
-  libclang-rt-19-dev=1:19.1.4-1~deb12u1                      \
-  libclang-19-dev=1:19.1.4-1~deb12u1                         \
-  libclang1-19=1:19.1.4-1~deb12u1                            \
-  clang-format-19=1:19.1.4-1~deb12u1                         \
-  python3-clang-19=1:19.1.4-1~deb12u1                        \
-  clangd-19=1:19.1.4-1~deb12u1                               \
-  clang-tidy-19=1:19.1.4-1~deb12u1                         &&\
+  llvm-19=1:19.1.4-1~deb12u1                                 \
+  python3-clang-19=1:19.1.4-1~deb12u1                      &&\
   apt-get clean                                            &&\
   rm -rf /var/lib/apt/lists/*
 RUN find /usr/bin -regextype posix-extended  \

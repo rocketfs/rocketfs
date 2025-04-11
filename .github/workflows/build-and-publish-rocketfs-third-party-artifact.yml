@@ -3,7 +3,10 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     container: ghcr.io/rocketfs/rocketfs:mkdir
     strategy:
       fail-fast: true

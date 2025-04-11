@@ -2,6 +2,7 @@
 
 #include "namenode/service/op/create_op.h"
 
+#include <fmt/base.h>
 #include <quill/LogMacros.h>
 #include <quill/core/ThreadContextManager.h>
 #include <sys/stat.h>
@@ -17,7 +18,6 @@
 
 #include <unifex/coroutine.hpp>
 
-#include "base.h"
 #include "common/logger.h"
 #include "common/status.h"
 #include "common/time_util.h"

@@ -1,0 +1,104 @@
+root@0cffe8e97afc:/dpdk# cat e1d8a879abac.diff
+commit e1d8a879abac499a66801bb8238d59ba52f4fc6b
+Author: David Marchand <david.marchand@redhat.com>
+Date:   Thu Jul 11 11:35:36 2024 +0200
+
+    buildtools: fix build with clang 17 and ASan
+
+    ASan included in clang 17 and later suffixes symbols.
+    $ nm build/drivers/libtmp_rte_net_null.a | grep this_pmd
+    0000000000000000 r this_pmd_name3
+    0000000000000000 n this_pmd_name3.f2cd16678ab09dba8fd23405d8d11fce
+
+    This breaks the detection of driver symbols in pmdinfogen which then
+    creates duplicate symbols "_pmd_info" in many drivers. Such duplicate
+    symbols trigger a link error.
+
+    $ grep -w _pmd_info build/drivers/rte_net_*.pmd.c
+    build/drivers/rte_net_af_packet.pmd.c:const char _pmd_info[]
+            __attribute__((used)) =
+            "PMD_INFO_STRING= {\"name\": \"\", \"pci_ids\": []}";
+    build/drivers/rte_net_null.pmd.c:const char _pmd_info[]
+            __attribute__((used)) =
+            "PMD_INFO_STRING= {\"name\": \"\", \"pci_ids\": []}";
+
+    A simple reproducer:
+    $ CC=clang meson setup build -Denable_apps=test-pmd -Ddisable_libs=* \
+      -Denable_drivers=net/null,net/af_packet -Dtests=false \
+      -Db_lundef=false -Db_sanitize=address
+
+    $ ninja -C build
+
+    Before this patch, the pmdinfogen script was relying on a symbol name
+    starting with this_pmd_name.
+    On the other hand, what this script needs is symbols whose names are
+    this_pmd_name ## __COUNTER__, see below an example for PCI driver
+    symbols (the same applies to other buses).
+
+    $ git grep -w RTE_PMD_EXPORT_NAME drivers/bus/pci/bus_pci_driver.h
+    drivers/bus/pci/bus_pci_driver.h:RTE_PMD_EXPORT_NAME(nm, __COUNTER__)
+    $ git grep -B1 this_pmd_name lib/eal/
+    lib/eal/include/rte_dev.h-#define RTE_PMD_EXPORT_NAME(name, idx) \
+    lib/eal/include/rte_dev.h:static const char
+            RTE_PMD_EXPORT_NAME_ARRAY(this_pmd_name, idx) \
+    $ git grep define.RTE_PMD_EXPORT_NAME_ARRAY lib/eal/include/rte_dev.h
+    lib/eal/include/rte_dev.h:#define
+            RTE_PMD_EXPORT_NAME_ARRAY(n, idx) n##idx[]
+
+    Adjust the symbol filter for both ELF and COFF implementations.
+
+    Bugzilla ID: 1466
+    Cc: stable@dpdk.org
+
+    Reported-by: Ali Alnubani <alialnu@nvidia.com>
+    Reported-by: Song Jiale <songx.jiale@intel.com>
+    Signed-off-by: David Marchand <david.marchand@redhat.com>
+    Tested-by: Song Jiale <songx.jiale@intel.com>
+
+diff --git a/buildtools/pmdinfogen.py b/buildtools/pmdinfogen.py
+index 2a44f17bda..dfb89500c0 100755
+--- a/buildtools/pmdinfogen.py
++++ b/buildtools/pmdinfogen.py
+@@ -6,6 +6,7 @@
+ import argparse
+ import ctypes
+ import json
++import re
+ import sys
+ import tempfile
+
+@@ -66,11 +67,11 @@ def _get_symbol_by_name(self, name):
+                 return [symbol]
+         return None
+
+-    def find_by_prefix(self, prefix):
+-        prefix = prefix.encode("utf-8") if self._legacy_elftools else prefix
++    def find_by_pattern(self, pattern):
++        pattern = pattern.encode("utf-8") if self._legacy_elftools else pattern
+         for i in range(self._symtab.num_symbols()):
+             symbol = self._symtab.get_symbol(i)
+-            if symbol.name.startswith(prefix):
++            if re.match(pattern, symbol.name):
+                 yield ELFSymbol(self._image, symbol)
+
+
+@@ -97,9 +98,9 @@ def __init__(self, data):
+     def is_big_endian(self):
+         return False
+
+-    def find_by_prefix(self, prefix):
++    def find_by_pattern(self, pattern):
+         for symbol in self._image.symbols:
+-            if symbol.name.startswith(prefix):
++            if re.match(pattern, symbol.name):
+                 yield COFFSymbol(self._image, symbol)
+
+     def find_by_name(self, name):
+@@ -199,7 +200,7 @@ def dump(self, file):
+
+ def load_drivers(image):
+     drivers = []
+-    for symbol in image.find_by_prefix("this_pmd_name"):
++    for symbol in image.find_by_pattern("^this_pmd_name[0-9]+$"):
+         drivers.append(Driver.load(image, symbol))
+     return drivers

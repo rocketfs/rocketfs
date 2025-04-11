@@ -10,9 +10,6 @@
 #     `CMAKE_C_COMPILER` to `CMAKE_INSTALL_PREFIX`.
 #   * Next, arguments for dependencies used by the project, e.g.,
 #     `-DWITH_ABSEIL=ON` or `-Dabsl_DIR`.
-#   * Then, other general configuration options.
-#   * Finally, options that disable shared libraries and tests, e.g.,
-#     `-Dprotobuf_BUILD_SHARED_LIBS=OFF` and `-Dprotobuf_BUILD_TESTS=OFF`.
 
 cmake_minimum_required(VERSION 3.25)
 
@@ -102,15 +99,17 @@ endfunction()
 set_library_paths(abseil)
 set_library_paths(asio-grpc)
 set_library_paths(curl)
+set_library_paths(dpdk)
+set_library_paths(f-stack)
 set_library_paths(flatbuffers)
 set_library_paths(fmt)
-set_library_paths(libfuse)
 set_library_paths(gflags)
 set_library_paths(googletest)
 set_library_paths(grpc)
 set_library_paths(gtest-parallel)
 set_library_paths(jemalloc)
 set_library_paths(json)
+set_library_paths(libfuse)
 set_library_paths(libunifex)
 set_library_paths(libunwind)
 set_library_paths(magic_enum)
@@ -121,6 +120,7 @@ set_library_paths(protobuf)
 set_library_paths(quill)
 set_library_paths(rocksdb)
 set_library_paths(snappy)
+set_library_paths(spdk)
 set_library_paths(thread-pool)
 set_library_paths(zlib)
 set_library_paths(zstd)
@@ -176,16 +176,83 @@ ExternalProject_Add(
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
              -DCMAKE_BUILD_TYPE=Release
-             -DCMAKE_INSTALL_PREFIX=${CURL_OUTPUT}
-             -DOPENSSL_ROOT_DIR=${OPENSSL_OUTPUT}
              -DBUILD_SHARED_LIBS=OFF
              -DBUILD_STATIC_LIBS=ON
              -DBUILD_STATIC_CURL=ON
+             -DCMAKE_INSTALL_PREFIX=${CURL_OUTPUT}
+             -DOPENSSL_ROOT_DIR=${OPENSSL_OUTPUT}
   LOG_CONFIGURE ON
   LOG_BUILD ON
   LOG_INSTALL ON
   LOG_OUTPUT_ON_FAILURE ON)
 add_dependencies(curl openssl)
+
+set(DPDK_SANITIZE_OPTIONS "")
+if(ENABLE_ADDRESS_SANITIZER)
+  list(APPEND DPDK_SANITIZE_OPTIONS "address")
+endif()
+if(ENABLE_UNDEFINED_BEHAVIOR_SANITIZER)
+  list(APPEND DPDK_SANITIZE_OPTIONS "undefined")
+endif()
+if(ENABLE_THREAD_SANITIZER)
+  list(APPEND DPDK_SANITIZE_OPTIONS "thread")
+endif()
+list(JOIN DPDK_SANITIZE_OPTIONS "," DPDK_SANITIZE_OPTIONS_STR)
+if(DPDK_SANITIZE_OPTIONS_STR STREQUAL "")
+  set(DPDK_SANITIZE_OPTIONS_STR "none")
+endif()
+ExternalProject_Add(
+  dpdk
+  PREFIX ${DPDK_PREFIX}
+  GIT_REPOSITORY https://github.com/DPDK/dpdk.git
+  GIT_TAG v23.11
+  GIT_SHALLOW ON
+  PATCH_COMMAND patch -p1 -i ${CMAKE_CURRENT_SOURCE_DIR}/dpdk-e1d8a879abac.diff
+  CONFIGURE_COMMAND
+    ${CMAKE_COMMAND} -E env #
+    CC=${CMAKE_C_COMPILER} #
+    CXX=${CMAKE_CXX_COMPILER} #
+    meson #
+    setup #
+    ${DPDK_PREFIX}/src/dpdk #
+    -Db_sanitize=${DPDK_SANITIZE_OPTIONS_STR} #
+    -Db_lundef=false #
+    -Dprefer_static=true #
+    -Dprefix=${DPDK_OUTPUT}
+  BUILD_COMMAND ninja
+  INSTALL_COMMAND ninja install
+  LOG_CONFIGURE ON
+  LOG_BUILD ON
+  LOG_INSTALL ON
+  LOG_OUTPUT_ON_FAILURE ON)
+
+ExternalProject_Add(
+  f-stack
+  PREFIX ${F_STACK_PREFIX}
+  GIT_REPOSITORY https://github.com/Clcanny/f-stack.git
+  GIT_TAG dcefada0f52d9cf817b5d60fc06cad2052a8bf0a
+  GIT_SHALLOW ON
+  BINARY_DIR ${F_STACK_PREFIX}/src/f-stack/lib
+  CONFIGURE_COMMAND echo
+  BUILD_COMMAND
+    ${CMAKE_COMMAND} -E env #
+    PREFIX=${F_STACK_OUTPUT} #
+    PKG_CONFIG_PATH=${DPDK_OUTPUT}/lib/x86_64-linux-gnu/pkgconfig
+    CONF_CFLAGS=-I${OPENSSL_OUTPUT}/include #
+    make
+  INSTALL_COMMAND
+    mkdir -p #
+    ${F_STACK_OUTPUT}/include #
+    ${F_STACK_OUTPUT}/lib #
+    ${F_STACK_OUTPUT}/bin
+  COMMAND
+    ${CMAKE_COMMAND} -E env #
+    PREFIX=${F_STACK_OUTPUT} #
+    PKG_CONFIG_PATH=${DPDK_OUTPUT}/lib/x86_64-linux-gnu/pkgconfig
+    CONF_CFLAGS=-I${OPENSSL_OUTPUT}/include #
+    make #
+    install)
+add_dependencies(f-stack dpdk openssl)
 
 ExternalProject_Add(
   flatbuffers
@@ -227,29 +294,6 @@ ExternalProject_Add(
   LOG_OUTPUT_ON_FAILURE ON)
 
 ExternalProject_Add(
-  libfuse
-  PREFIX ${LIBFUSE_PREFIX}
-  GIT_REPOSITORY https://github.com/libfuse/libfuse.git
-  GIT_TAG fuse-3.16.2
-  GIT_SHALLOW ON
-  CONFIGURE_COMMAND
-    ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER}
-    meson setup ${LIBFUSE_PREFIX}/src/libfuse
-  COMMAND
-    meson configure -Dbuildtype=release -Ddefault_library=static
-    -Dprefer_static=true -Dc_args=${SANITIZER_FLAGS}
-    -Dc_link_args=${SANITIZER_FLAGS} -Dcpp_std=c++20
-    -Dcpp_args=${SANITIZER_FLAGS} -Dcpp_link_args=${SANITIZER_FLAGS}
-    -Dprefix=${LIBFUSE_OUTPUT}
-  COMMAND meson setup --reconfigure ${LIBFUSE_PREFIX}/src/libfuse
-  BUILD_COMMAND ninja
-  INSTALL_COMMAND ninja install
-  LOG_CONFIGURE ON
-  LOG_BUILD ON
-  LOG_INSTALL ON
-  LOG_OUTPUT_ON_FAILURE ON)
-
-ExternalProject_Add(
   gflags
   PREFIX ${GFLAGS_PREFIX}
   GIT_REPOSITORY https://github.com/gflags/gflags.git
@@ -261,8 +305,8 @@ ExternalProject_Add(
              -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
              -DCMAKE_BUILD_TYPE=Release
-             -DCMAKE_INSTALL_PREFIX=${GFLAGS_OUTPUT}
              -DBUILD_STATIC_LIBS=ON
+             -DCMAKE_INSTALL_PREFIX=${GFLAGS_OUTPUT}
              -DBUILD_TESTING=OFF
   LOG_CONFIGURE ON
   LOG_BUILD ON
@@ -342,8 +386,12 @@ ExternalProject_Add(
   BUILD_IN_SOURCE ON
   CONFIGURE_COMMAND sh autogen.sh
   COMMAND
-    ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER}
-    ./configure --prefix=${JEMALLOC_OUTPUT} --enable-prof
+    ${CMAKE_COMMAND} -E env #
+    CC=${CMAKE_C_COMPILER} #
+    CXX=${CMAKE_CXX_COMPILER} #
+    ./configure #
+    --prefix=${JEMALLOC_OUTPUT} #
+    --enable-prof
   LOG_CONFIGURE ON
   LOG_BUILD ON
   LOG_INSTALL ON
@@ -362,6 +410,35 @@ ExternalProject_Add(
              -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
              -DCMAKE_BUILD_TYPE=Release
              -DCMAKE_INSTALL_PREFIX=${JSON_OUTPUT})
+
+ExternalProject_Add(
+  libfuse
+  PREFIX ${LIBFUSE_PREFIX}
+  GIT_REPOSITORY https://github.com/libfuse/libfuse.git
+  GIT_TAG fuse-3.16.2
+  GIT_SHALLOW ON
+  CONFIGURE_COMMAND
+    ${CMAKE_COMMAND} -E env #
+    CC=${CMAKE_C_COMPILER} #
+    CXX=${CMAKE_CXX_COMPILER} #
+    meson #
+    setup #
+    ${LIBFUSE_PREFIX}/src/libfuse #
+    -Dc_args=${SANITIZER_FLAGS} #
+    -Dc_link_args=${SANITIZER_FLAGS} #
+    -Dcpp_std=c++20 #
+    -Dcpp_args=${SANITIZER_FLAGS} #
+    -Dcpp_link_args=${SANITIZER_FLAGS} #
+    -Dbuildtype=release #
+    -Ddefault_library=static #
+    -Dprefer_static=true #
+    -Dprefix=${LIBFUSE_OUTPUT}
+  BUILD_COMMAND ninja
+  INSTALL_COMMAND ninja install
+  LOG_CONFIGURE ON
+  LOG_BUILD ON
+  LOG_INSTALL ON
+  LOG_OUTPUT_ON_FAILURE ON)
 
 ExternalProject_Add(
   libunifex
@@ -388,8 +465,13 @@ ExternalProject_Add(
   BUILD_IN_SOURCE ON
   CONFIGURE_COMMAND autoreconf -i
   COMMAND
-    ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER}
-    ./configure --disable-shared --enable-static --prefix=${LIBUNWIND_OUTPUT}
+    ${CMAKE_COMMAND} -E env #
+    CC=${CMAKE_C_COMPILER} #
+    CXX=${CMAKE_CXX_COMPILER} #
+    ./configure #
+    --disable-shared #
+    --enable-static #
+    --prefix=${LIBUNWIND_OUTPUT}
   LOG_CONFIGURE ON
   LOG_BUILD ON
   LOG_INSTALL ON
@@ -421,11 +503,15 @@ ExternalProject_Add(
   GIT_TAG openssl-3.4.0
   GIT_SHALLOW ON
   CONFIGURE_COMMAND
-    ${CMAKE_COMMAND} -E env CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER}
-    CFLAGS=${SANITIZER_FLAGS} CXXFLAGS=${SANITIZER_FLAGS}
-    ${OPENSSL_PREFIX}/src/openssl/Configure no-shared
+    ${CMAKE_COMMAND} -E env #
+    CC=${CMAKE_C_COMPILER} #
+    CXX=${CMAKE_CXX_COMPILER} #
+    CFLAGS=${SANITIZER_FLAGS} #
+    CXXFLAGS=${SANITIZER_FLAGS} #
+    ${OPENSSL_PREFIX}/src/openssl/Configure #
     --with-zlib-include=${ZLIB_OUTPUT}/include
-    --with-zlib-lib=${ZLIB_OUTPUT}/lib --openssldir=${OPENSSL_OUTPUT}
+    --with-zlib-lib=${ZLIB_OUTPUT}/lib #
+    --openssldir=${OPENSSL_OUTPUT} #
     --prefix=${OPENSSL_OUTPUT})
 add_dependencies(openssl zlib)
 
@@ -594,6 +680,77 @@ ExternalProject_Add(
   LOG_INSTALL ON
   LOG_OUTPUT_ON_FAILURE ON)
 
+# git clone https://github.com/DPDK/dpdk.git -b v23.11 cd dpdk CC=clang meson
+# setup -Dprefer_static=true -Db_sanitize=address,undefined -Denable_kmods=true
+# -Dc_args= -Dc_link_args= -Dprefix=/tmp/dpdk-output build cd build ninja meson
+# install ldconfig
+#
+# https://www.alibabacloud.com/blog/coroutine-made-dpdk-development-easy_599986
+# git clone https://github.com/Clcanny/f-stack.git -b
+# 20039e1b6cff99a2f0e7a9cc1f69e3858d6b371a cd /tmp/f-stack/lib/ mkdir -p
+# /tmp/f-stack-output/include /tmp/f-stack-output/lib /tmp/f-stack-output/bin
+# PREFIX=/tmp/f-stack-output
+# PKG_CONFIG_PATH=/tmp/dpdk-output/lib/x86_64-linux-gnu/pkgconfig make install
+# cd /tmp/f-stack/example CFLAGS="-fsanitize=address -fsanitize=undefined"
+# CXXFLAGS="-fsanitize=address -fsanitize=undefined" LDFLAGS="-fsanitize=address
+# -fsanitize=undefined"
+# PKG_CONFIG_PATH=/tmp/dpdk-output/lib/x86_64-linux-gnu/pkgconfig make
+#
+# git clone https://github.com/spdk/spdk.git -b v24.01 ./scripts/pkgdep.sh
+# CFLAGS="-fsanitize=address -fsanitize=undefined" CXXFLAGS="-fsanitize=address
+# -fsanitize=undefined" LDFLAGS="-fsanitize=address -fsanitize=undefined"
+# ./configure --with-dpdk=/tmp/dpdk-output make install echo $((1024*1024)) >
+# /proc/sys/vm/nr_hugepages docker cp a5b1b623d1c3:/spdk .
+# root@iZmj714zx3o1kxwj6ek8p1Z:/tmp# ./spdk/scripts/setup.sh 0000:00:04.0 (8086
+# 5845): Active devices: mount@nvme0n1:nvme0n1p2,mount@nvme0n1:nvme0n1p3, so not
+# binding PCI dev 0000:00:08.0 (8086 5845): nvme -> uio_pci_generic INFO:
+# Requested 1024 hugepages but 1024 already allocated on node0 mkdir
+# /mnt/spdk_hugetlbfs mount -t hugetlbfs -o uid=root,pagesize=2M none
+# /mnt/spdk_hugetlbfs ./spdk/scripts/gen_nvme.sh --json-with-subsystems >
+# ./spdk/build/examples/hello_bdev.json intel_iommu=off lspci -vv -s
+# 0000:00:08.0 DRIVER_OVERRIDE=/tmp/dpdk-kmods/linux/igb_uio/igb_uio.ko
+# /tmp/spdk/scripts/setup.sh /tmp/spdk/build/bin/spdk_nvme_identify
+# ./build/bin/spdk_tgt --json nvme.json ./scripts/rpc.py bdev_get_bdevs ->
+# Malloc0n1 /tmp/spdk/build/examples/hello_blob nvme.json
+#
+# docker cp a5b1b623d1c3:/f-stack/example/helloworld . docker cp
+# a5b1b623d1c3:/f-stack/example/config.ini . ./helloworld apt install net-tools
+# https://github.com/F-Stack/f-stack/blob/dev/doc/Launch_F-Stack_on_AWS_EC2_in_one_minute.md
+# ifconfig eth1 up ip link set dev eth1 up ip addr add 172.31.23.87 dev eth1
+# modprobe uio https://doc.dpdk.org/dts/gsg/usr_guide/igb_uio.html git clone
+# http://dpdk.org/git/dpdk-kmods apt-get install linux-source apt-get install
+# linux-headers-$(uname -r) ifconfig eth1 down mkdir /usr/lib/modules/`uname
+# -r`/extra cp igb_uio.ko /usr/lib/modules/`uname -r`/extra/igb_uio.ko insmod
+# /usr/lib/modules/`uname -r`/extra/igb_uio.ko python3 /tmp/dpdk-devbind.py
+# --bind=igb_uio eth1 关掉 RSS lib/ff_dpdk_if.c
+
+ExternalProject_Add(
+  spdk
+  PREFIX ${SPDK_PREFIX}
+  GIT_REPOSITORY https://github.com/spdk/spdk.git
+  GIT_TAG v24.09
+  GIT_SHALLOW ON
+  GIT_SUBMODULES intel-ipsec-mb isa-l isa-l-crypto libvfio-user ocf xnvme
+  BUILD_IN_SOURCE ON
+  CONFIGURE_COMMAND
+    ${CMAKE_COMMAND} -E env #
+    CC=${CMAKE_C_COMPILER} #
+    CXX=${CMAKE_CXX_COMPILER} #
+    CFLAGS=${SANITIZER_FLAGS} #
+    CXXFLAGS=${SANITIZER_FLAGS} #
+    LDFLAGS=${SANITIZER_FLAGS} #
+    ./configure #
+    --prefix=${SPDK_OUTPUT} #
+    --with-dpdk=${DPDK_OUTPUT} #
+    --without-nvme-cuse
+  BUILD_COMMAND make
+  INSTALL_COMMAND make install
+  LOG_CONFIGURE ON
+  LOG_BUILD ON
+  LOG_INSTALL ON
+  LOG_OUTPUT_ON_FAILURE ON)
+add_dependencies(spdk dpdk)
+
 ExternalProject_Add(
   thread-pool
   PREFIX ${THREAD_POOL_PREFIX}
@@ -649,11 +806,12 @@ ExternalProject_Add(
   LOG_OUTPUT_ON_FAILURE ON)
 
 install(
-  FILES ${CMAKE_SOURCE_DIR}/gtest-parallelConfig.cmake
+  FILES ${CMAKE_SOURCE_DIR}/f-stackConfig.cmake
+        ${CMAKE_SOURCE_DIR}/gtest-parallelConfig.cmake
         ${CMAKE_SOURCE_DIR}/jemallocConfig.cmake
         ${CMAKE_SOURCE_DIR}/libfuseConfig.cmake
         ${CMAKE_SOURCE_DIR}/libunwindConfig.cmake
-        ${CMAKE_SOURCE_DIR}/thread-poolConfig.cmake
         ${CMAKE_SOURCE_DIR}/Targets.cmake
+        ${CMAKE_SOURCE_DIR}/thread-poolConfig.cmake
         ${CMAKE_SOURCE_DIR}/ZLIBConfig.cmake
   DESTINATION ${CMAKE_BINARY_DIR}/output)

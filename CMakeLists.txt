@@ -64,16 +64,23 @@ list(FILTER srcs EXCLUDE REGEX "_main\\.cc$")
 add_library(rocketfs STATIC ${srcs})
 target_link_libraries(
   rocketfs
-  PUBLIC RocksDB::rocksdb
+  PUBLIC -Wl,--start-group
          asio-grpc::asio-grpc-unifex
+         -Wl,--whole-archive
+         dpdk
+         f-stack
+         -Wl,--no-whole-archive
          fmt::fmt-header-only
-         libfuse
+         gflags::gflags_static
          gRPC::grpc++
          gRPC::grpc++_unsecure
-         gflags::gflags_static
+         libfuse
+         numa
          protos
          quill::quill
-         unifex::unifex)
+         RocksDB::rocksdb
+         unifex::unifex
+         -Wl,--end-group)
 target_compile_definitions(
   rocketfs
   PUBLIC UNIFEX_NO_ASYNC_STACKS
