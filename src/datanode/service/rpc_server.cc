@@ -55,7 +55,7 @@ RpcServer::RpcServer(int listening_port) {
   sock_fd_ = ff_socket(AF_INET, SOCK_STREAM, 0);
   CHECK_GE(sock_fd_, 0);
   int on = 1;
-  CHECK_EQ(ff_ioctl(sock_fd_, O_NONBLOCK, &on), 0);
+  CHECK_EQ(ff_ioctl(sock_fd_, FIONBIO, &on), 0);
 
   struct sockaddr_in addr;
   std::memset(&addr, 0, sizeof(addr));

@@ -4,6 +4,9 @@
 
 namespace rocketfs {
 
+// https://www.reddit.com/r/cpp/comments/13dmuqt/coroutine_made_dpdk_dev_easy/
+// https://github.com/alibaba/PhotonLibOS
+// https://man.openbsd.org/kqueue.2
 class RpcServer {
  public:
   explicit RpcServer(int listening_port);
