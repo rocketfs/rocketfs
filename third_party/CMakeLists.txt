@@ -118,6 +118,7 @@ set_library_paths(openssl)
 set_library_paths(opentelemetry)
 set_library_paths(prometheus_cpp)
 set_library_paths(protobuf)
+set_library_paths(pybind11)
 set_library_paths(quill)
 set_library_paths(rocksdb)
 set_library_paths(snappy)
@@ -322,7 +323,7 @@ ExternalProject_Add(
   gtest-parallel
   PREFIX ${GTEST_PARALLEL_PREFIX}
   GIT_REPOSITORY https://github.com/google/gtest-parallel.git
-  GIT_TAG 96f4f904922f9bf66689e749c40f314845baaac8
+  GIT_TAG cd488bdedc1d2cffb98201a17afc1b298b0b90f1
   GIT_SHALLOW ON
   CONFIGURE_COMMAND echo
   BUILD_COMMAND echo
@@ -522,6 +523,24 @@ ExternalProject_Add(
   LOG_INSTALL ON
   LOG_OUTPUT_ON_FAILURE ON)
 add_dependencies(protobuf abseil zlib)
+
+ExternalProject_Add(
+  pybind11
+  PREFIX ${PYBIND11_PREFIX}
+  GIT_REPOSITORY https://github.com/pybind/pybind11.git
+  GIT_TAG v3.0.0
+  GIT_SHALLOW ON
+  CMAKE_ARGS -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+             -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+             -DCMAKE_C_FLAGS=${SANITIZER_FLAGS}
+             -DCMAKE_CXX_FLAGS=${SANITIZER_FLAGS}
+             -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+             -DCMAKE_BUILD_TYPE=Release
+             -DCMAKE_INSTALL_PREFIX=${PYBIND11_OUTPUT}
+  LOG_CONFIGURE ON
+  LOG_BUILD ON
+  LOG_INSTALL ON
+  LOG_OUTPUT_ON_FAILURE ON)
 
 ExternalProject_Add(
   quill
